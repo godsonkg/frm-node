@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SELF=$(readlink -f "${BASH_SOURCE[0]}")
+FRM_HOME=$(cd "$(dirname "$SELF")" && pwd)
+
+# shellcheck disable=SC1091
+source "$FRM_HOME/versions.env"
+source "$FRM_HOME/lib/common.sh"
+source "$FRM_HOME/lib/registry.sh"
+source "$FRM_HOME/lib/download.sh"
+source "$FRM_HOME/lib/service.sh"
+source "$FRM_HOME/lib/firewall.sh"
+source "$FRM_HOME/protocols/base.sh"
+source "$FRM_HOME/lib/exporter.sh"
+source "$FRM_HOME/lib/diagnostic.sh"
+source "$FRM_HOME/lib/maintenance.sh"
+source "$FRM_HOME/protocols/anytls.sh"
+source "$FRM_HOME/protocols/hysteria2.sh"
+source "$FRM_HOME/protocols/reality.sh"
+source "$FRM_HOME/protocols/snell.sh"
+
+usage() {
+  cat <<'EOF'
+frm-node 中文节点管理器
+
+用法：
+  frm                         打开中文菜单
+  frm status                  查看实例状态
+  frm list                    列出已安装实例
+  frm install <协议>          安装节点
+  frm show [实例|all]         显示客户端配置
+  frm start|stop|restart 实例 管理实例服务
+  frm logs 实例 [--follow]    查看日志
+  frm doctor                  完整中文诊断
+  frm update                  更新已安装协议核心
+  frm backup                  备份配置与核心
+  frm restore [备份文件]      恢复备份
+  frm uninstall 实例          删除指定实例
+  frm version                 查看版本
+
+协议名称：reality、anytls、hysteria2、snell4、snell4-shadowtls、
+          snell5、snell5-shadowtls、snell6
+EOF
+}
+
+install_protocol() {
+  case ${1:-} in
+    reality) protocol_install_reality ;;
+    anytls) protocol_install_anytls ;;
+    hysteria2|hy2) protocol_install_hysteria2 ;;
+    snell4) protocol_install_snell 4 native ;;
+    snell4-shadowtls) protocol_install_snell 4 shadowtls ;;
+    snell5) protocol_install_snell 5 native ;;
+    snell5-shadowtls) protocol_install_snell 5 shadowtls ;;
+    snell6) protocol_install_snell 6 native ;;
+    *) die "未知协议：${1:-空}。执行 frm help 查看列表。" ;;
+  esac
+}
+
+show_status() {
+  local id=${1:-}
+  if [[ -z $id ]]; then
+    registry_table
+    return
+  fi
+  registry_exists "$id" || die "实例不存在：$id"
+  doctor_instance "$id"
+}
+
+show_logs() {
+  local id=$1 follow=${2:-} service args=(--no-pager -n 100)
+  registry_exists "$id" || die "实例不存在：$id"
+  [[ $follow != --follow ]] || args=(-f)
+  while IFS= read -r service; do
+    journalctl -u "$service" "${args[@]}"
+  done < <(instance_services "$id")
+}
+
+install_menu() {
+  cat <<'EOF'
+
+安装节点
+  1) VLESS Reality Vision
+  2) AnyTLS
+  3) Hysteria2
+  4) Snell v4 原生
+  5) Snell v4 + ShadowTLS v3
+  6) Snell v5 原生
+  7) Snell v5 + ShadowTLS v3（高级）
+  8) Snell v6 测试版（原生，不套 ShadowTLS）
+  0) 返回
+EOF
+  local choice
+  read -r -p "请选择: " choice
+  case $choice in
+    1) install_protocol reality ;;
+    2) install_protocol anytls ;;
+    3) install_protocol hysteria2 ;;
+    4) install_protocol snell4 ;;
+    5) install_protocol snell4-shadowtls ;;
+    6) install_protocol snell5 ;;
+    7) install_protocol snell5-shadowtls ;;
+    8) install_protocol snell6 ;;
+    0) return ;;
+    *) warn "无效选择。" ;;
+  esac
+}
+
+select_instance() {
+  registry_table
+  ask_value "请输入实例名称"
+}
+
+main_menu() {
+  local choice id
+  while true; do
+    cat <<EOF
+
+================================================
+       frm-node 中文节点管理器  $FRM_VERSION
+       快速命令：frm / frm-node
+================================================
+  1) 查看节点状态
+  2) 安装新节点
+  3) 显示客户端配置
+  4) 重启指定节点
+  5) 查看节点日志
+  6) 中文完整诊断
+  7) 更新协议核心
+  8) 备份与恢复
+  9) 删除指定节点
+  0) 退出
+------------------------------------------------
+EOF
+    read -r -p "请选择: " choice
+    case $choice in
+      1) show_status ;;
+      2) install_menu ;;
+      3) export_all ;;
+      4) id=$(select_instance); instance_service_action "$id" restart; show_status "$id" ;;
+      5) id=$(select_instance); show_logs "$id" ;;
+      6) doctor_all || true ;;
+      7) confirm "更新前会自动备份，继续吗" N && update_installed_cores ;;
+      8) backup_all; info "恢复请使用：frm restore <备份文件>" ;;
+      9) id=$(select_instance); remove_instance "$id" ;;
+      0) exit 0 ;;
+      *) warn "无效选择。" ;;
+    esac
+  done
+}
+
+command=${1:-menu}
+case $command in
+  help|-h|--help) usage; exit 0 ;;
+  version|-v|--version) printf 'frm-node %s\n' "$FRM_VERSION"; exit 0 ;;
+esac
+
+need_root "$@"
+detect_os
+init_layout
+
+case $command in
+  menu) main_menu ;;
+  status|list) show_status "${2:-}" ;;
+  install) install_protocol "${2:-}" ;;
+  show)
+    if [[ ${2:-all} == all ]]; then export_all; else export_instance "$2"; fi
+    ;;
+  start|stop|restart) [[ -n ${2:-} ]] || die "请指定实例名称。"; instance_service_action "$2" "$command" ;;
+  logs) [[ -n ${2:-} ]] || die "请指定实例名称。"; show_logs "$2" "${3:-}" ;;
+  doctor) doctor_all ;;
+  update) update_installed_cores ;;
+  backup) backup_all ;;
+  restore) restore_backup "${2:-}" ;;
+  uninstall) [[ -n ${2:-} ]] || die "请指定实例名称。"; remove_instance "$2" ;;
+  migrate) migrate_legacy ;;
+  *) usage; die "未知命令：$command" ;;
+esac

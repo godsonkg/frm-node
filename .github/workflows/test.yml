@@ -1,0 +1,23 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test tools
+        run: sudo apt-get update && sudo apt-get install -y jq shellcheck
+      - name: Bash syntax
+        run: find . -type f \( -name '*.sh' -o -name 'frm-node' \) -print0 | xargs -0 -n1 bash -n
+      - name: ShellCheck
+        run: find . -type f \( -name '*.sh' -o -name 'frm-node' \) -print0 | xargs -0 shellcheck -x
+      - name: Smoke test
+        run: bash tests/smoke.sh
+
