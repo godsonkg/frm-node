@@ -129,15 +129,29 @@ adopt_snell_version() {
 }
 
 adopt_scan_manual_snell() {
-  local config unit version port state
+  local config unit version port state service_list=snell.service stls backend_port stls_backend external_port
   config=$(adopt_path /etc/snell-server.conf)
   unit=$(adopt_path /etc/systemd/system/snell.service)
   [[ -r $config && -r $unit ]] || return 0
   version=$(adopt_snell_version "$config")
-  port=$(sed -nE 's/^[[:space:]]*listen[[:space:]]*=.*:([0-9]+)[[:space:]]*$/\1/p' "$config" | head -n 1)
+  backend_port=$(sed -nE 's/^[[:space:]]*listen[[:space:]]*=.*:([0-9]+)[[:space:]]*$/\1/p' "$config" | head -n 1)
+  port=$backend_port
+  stls=$(adopt_path /etc/systemd/system/shadow-tls.service)
+  if [[ -r $stls ]]; then
+    stls_backend=$(sed -nE 's/.*--server(=|[[:space:]])[^ ]*:([0-9]+).*/\2/p' "$stls" | head -n 1)
+    external_port=$(sed -nE 's/.*--listen(=|[[:space:]])([^ ]*:)?([0-9]+).*/\3/p' "$stls" | head -n 1)
+    if [[ -n $backend_port && $stls_backend == "$backend_port" && $external_port =~ ^[0-9]+$ ]]; then
+      port=$external_port
+      service_list=snell.service,shadow-tls.service
+      version="${version}+ShadowTLS(旧拓扑)"
+    fi
+  fi
   [[ $port =~ ^[0-9]+$ ]] || port='?'
   state=$(adopt_service_state snell.service)
-  adopt_row manual-snell "snell${version}" "$port" tcp snell.service "$config" "$state"
+  if [[ $service_list == *,* && $(adopt_service_state shadow-tls.service) != active ]]; then
+    state='部分服务异常'
+  fi
+  adopt_row manual-snell "snell${version}" "$port" tcp "$service_list" "$config" "$state"
 }
 
 adopt_scan_raw() {
@@ -279,7 +293,8 @@ adopt_register_v2ray_agent() {
 }
 
 adopt_register_manual_snell() {
-  local config unit version port psk mode=legacy-native service_list=snell.service stls stls_password='' stls_sni=''
+  local config unit version port backend_port psk mode=legacy-native service_list=snell.service stls
+  local stls_backend external_port stls_password='' stls_sni=''
   config=$(adopt_path /etc/snell-server.conf)
   unit=$(adopt_path /etc/systemd/system/snell.service)
   [[ -r $config && -r $unit ]] || return 0
@@ -288,15 +303,20 @@ adopt_register_manual_snell() {
     warn "发现独立 Snell，但无法无歧义判断 v4/v5/v6；请执行 FRM_ADOPT_SNELL_VERSION=6 frm adopt register。"
     return 1
   fi
-  port=$(sed -nE 's/^[[:space:]]*listen[[:space:]]*=.*:([0-9]+)[[:space:]]*$/\1/p' "$config" | head -n 1)
+  backend_port=$(sed -nE 's/^[[:space:]]*listen[[:space:]]*=.*:([0-9]+)[[:space:]]*$/\1/p' "$config" | head -n 1)
+  port=$backend_port
   psk=$(sed -nE 's/^[[:space:]]*psk[[:space:]]*=[[:space:]]*(.*[^[:space:]])[[:space:]]*$/\1/p' "$config" | head -n 1)
   stls=$(adopt_path /etc/systemd/system/shadow-tls.service)
   if [[ -r $stls ]]; then
-    mode=legacy-shadowtls
-    service_list=snell.service,shadow-tls.service
-    port=$(sed -nE 's/.*--listen ([^ ]*:)?([0-9]+).*/\2/p' "$stls" | head -n 1)
-    stls_password=$(sed -nE 's/.*--password ([^ ]+).*/\1/p' "$stls" | head -n 1)
-    stls_sni=$(sed -nE 's/.*--tls ([^ :]+)(:[0-9]+)?.*/\1/p' "$stls" | head -n 1)
+    stls_backend=$(sed -nE 's/.*--server(=|[[:space:]])[^ ]*:([0-9]+).*/\2/p' "$stls" | head -n 1)
+    external_port=$(sed -nE 's/.*--listen(=|[[:space:]])([^ ]*:)?([0-9]+).*/\3/p' "$stls" | head -n 1)
+    if [[ -n $backend_port && $stls_backend == "$backend_port" && $external_port =~ ^[0-9]+$ ]]; then
+      mode=legacy-shadowtls
+      service_list=snell.service,shadow-tls.service
+      port=$external_port
+      stls_password=$(sed -nE 's/.*--password(=|[[:space:]])([^ ]+).*/\2/p' "$stls" | head -n 1)
+      stls_sni=$(sed -nE 's/.*--tls(=|[[:space:]])([^ :]+)(:[0-9]+)?.*/\2/p' "$stls" | head -n 1)
+    fi
   fi
   adopt_register_record manual-snell "snell$version" "$port" tcp "$service_list" "$config" /usr/local/bin/snell-server official \
     PSK "$psk" SNELL_VERSION "$version" MODE "$mode" SHADOWTLS_PASSWORD "$stls_password" SHADOWTLS_SNI "$stls_sni"

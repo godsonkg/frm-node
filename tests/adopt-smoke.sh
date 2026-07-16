@@ -55,19 +55,24 @@ cat >"$FRM_ADOPT_ROOT/etc/systemd/system/snell.service" <<'EOF'
 [Service]
 ExecStart=/usr/local/bin/snell-server -c /etc/snell-server.conf
 EOF
+cat >"$FRM_ADOPT_ROOT/etc/systemd/system/shadow-tls.service" <<'EOF'
+[Service]
+ExecStart=/usr/local/bin/shadow-tls --v3 server --listen 0.0.0.0:21443 --server 127.0.0.1:11443 --tls www.microsoft.com:443 --password shadow-password
+EOF
 
 scan=$(adopt_scan_raw)
 grep -q $'vless-all-in-one\treality\t443' <<<"$scan"
 grep -q $'vless-all-in-one\thysteria2\t8443' <<<"$scan"
 grep -q $'v2ray-agent\tanytls\t10443' <<<"$scan"
-grep -q $'manual-snell\tsnell6\t11443' <<<"$scan"
+grep -q $'manual-snell\tsnell6+ShadowTLS(旧拓扑)\t21443' <<<"$scan"
 
 adopt_register
 [[ $(registry_ids | wc -l) -eq 5 ]]
 jq -e '.ownership=="adopted" and .read_only==true' "$FRM_REGISTRY_DIR/adopt-vless-all-in-one-reality-443.json" >/dev/null
 grep -q '^UUID=' "$FRM_INSTANCE_DIR/adopt-vless-all-in-one-reality-443.env"
 grep -q 'type: anytls' < <(export_instance adopt-v2ray-agent-anytls-10443)
-grep -q 'version=6' < <(export_instance adopt-manual-snell-snell6-11443)
+grep -q 'version=6' < <(export_instance adopt-manual-snell-snell6-21443)
+grep -q 'shadow-tls-password=shadow-password' < <(export_instance adopt-manual-snell-snell6-21443)
 
 # Re-running registration must be idempotent.
 adopt_register >/dev/null
