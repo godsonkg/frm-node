@@ -46,6 +46,21 @@ registry_is_adopted() {
   [[ $(registry_ownership "$1") == adopted ]]
 }
 
+registry_is_external() {
+  [[ $(registry_ownership "$1") != frm ]]
+}
+
+registry_mark_taken_over() {
+  local id=$1 takeover_id=$2 file tmp
+  file=$(registry_path "$id")
+  tmp="$file.new"
+  jq --arg takeover_id "$takeover_id" \
+    '.ownership="taken-over" | .read_only=true | .takeover_id=$takeover_id |
+     .taken_over_at=(now | todateiso8601)' "$file" >"$tmp"
+  chmod 0600 "$tmp"
+  mv -f "$tmp" "$file"
+}
+
 registry_get() {
   local id=$1 filter=$2 file
   file=$(registry_path "$id")
@@ -74,7 +89,11 @@ registry_table() {
     service=$(registry_get "$id" '.services[0]')
     state=$(systemctl is-active "$service" 2>/dev/null || true)
     ownership=$(registry_ownership "$id")
-    [[ $ownership == adopted ]] && owner_label="兼容接管" || owner_label="frm 原生"
+    case $ownership in
+      adopted) owner_label="兼容接管" ;;
+      taken-over) owner_label="frm 接管" ;;
+      *) owner_label="frm 原生" ;;
+    esac
     printf '%-24s %-18s %-8s %-6s %-10s %-10s\n' \
       "$id" "$(registry_get "$id" '.protocol')" "$(registry_get "$id" '.port')" \
       "$(registry_get "$id" '.transport')" "${state:-unknown}" "$owner_label"

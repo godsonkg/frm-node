@@ -6,8 +6,10 @@ doctor_instance() {
   port=$(registry_get "$id" '.port')
   transport=$(registry_get "$id" '.transport')
   printf '\n[%s] %s\n' "$id" "$protocol"
-  if registry_is_adopted "$id"; then
+  if [[ $(registry_ownership "$id") == adopted ]]; then
     printf '  [信息] 兼容接管自 %s；原服务和配置保持不变\n' "$(registry_get "$id" '.source')"
+  elif [[ $(registry_ownership "$id") == taken-over ]]; then
+    printf '  [信息] 已由 frm-node 原地接管；数据面沿用 %s 的稳定配置\n' "$(registry_get "$id" '.source')"
   fi
   while IFS= read -r service; do
     state=$(systemctl is-active "$service" 2>/dev/null || true)

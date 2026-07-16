@@ -25,6 +25,7 @@ source "$ROOT/lib/service.sh"
 source "$ROOT/protocols/base.sh"
 source "$ROOT/lib/exporter.sh"
 source "$ROOT/lib/adopt.sh"
+source "$ROOT/lib/takeover.sh"
 
 init_layout
 mkdir -p "$FRM_ADOPT_ROOT/etc/vless-reality" \
@@ -83,5 +84,50 @@ grep -q 'shadow-tls-password=shadow-password' < <(export_instance adopt-manual-s
 # Re-running registration must be idempotent.
 adopt_register >/dev/null
 [[ $(registry_ids | wc -l) -eq 6 ]]
+
+# Full control-plane takeover must preserve the data plane and be reversible.
+MOCK_CRON="$TMP/root.cron"
+cat >"$MOCK_CRON" <<'EOF'
+30 1 * * * /bin/bash /etc/v2ray-agent/install.sh RenewTLS
+15 4 * * * echo keep-this-job
+EOF
+doctor_instance() { return 0; }
+confirm() { return 0; }
+systemctl() {
+  case ${1:-} in
+    show) return 0 ;;
+    cat) return 1 ;;
+    is-active) printf 'inactive\n'; return 3 ;;
+    is-enabled) printf 'disabled\n'; return 1 ;;
+    *) return 0 ;;
+  esac
+}
+crontab() {
+  case ${1:-} in
+    -l) cat "$MOCK_CRON" ;;
+    -r) : >"$MOCK_CRON" ;;
+    *) cp "$1" "$MOCK_CRON" ;;
+  esac
+}
+
+adopt_takeover >/dev/null
+[[ $(registry_get adopt-vless-all-in-one-reality-443 '.ownership') == taken-over ]]
+grep -q 'keep-this-job' "$MOCK_CRON"
+if grep -q 'v2ray-agent/install.sh' "$MOCK_CRON"; then exit 1; fi
+takeover_dir=$(takeover_latest_dir)
+(cd "$takeover_dir" && sha256sum -c payload.sha256 >/dev/null)
+adopt_takeover_status | grep -q '状态：active'
+
+adopt_takeover_rollback >/dev/null
+[[ $(registry_get adopt-vless-all-in-one-reality-443 '.ownership') == adopted ]]
+grep -q 'v2ray-agent/install.sh' "$MOCK_CRON"
+
+# A failed post-takeover health check must restore registry and cron state.
+doctor_instance() {
+  [[ $(registry_ownership "$1") != taken-over ]]
+}
+if (adopt_takeover >/dev/null 2>&1); then exit 1; fi
+[[ $(registry_get adopt-vless-all-in-one-reality-443 '.ownership') == adopted ]]
+grep -q 'v2ray-agent/install.sh' "$MOCK_CRON"
 
 echo "adoption smoke tests passed"

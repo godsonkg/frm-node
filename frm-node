@@ -16,6 +16,7 @@ source "$FRM_HOME/lib/exporter.sh"
 source "$FRM_HOME/lib/diagnostic.sh"
 source "$FRM_HOME/lib/maintenance.sh"
 source "$FRM_HOME/lib/adopt.sh"
+source "$FRM_HOME/lib/takeover.sh"
 source "$FRM_HOME/protocols/anytls.sh"
 source "$FRM_HOME/protocols/hysteria2.sh"
 source "$FRM_HOME/protocols/reality.sh"
@@ -42,6 +43,8 @@ frm-node 中文节点管理器
   frm adopt register         零中断登记兼容接管
   frm adopt report           输出不含凭据的脱敏报告
   frm adopt forget 实例       仅删除接管登记
+  frm adopt takeover          完整接管旧节点控制面
+  frm adopt rollback          回滚最近一次完整接管
   frm version                 查看版本
 
 协议名称：reality、anytls、hysteria2、snell4、snell4-shadowtls、

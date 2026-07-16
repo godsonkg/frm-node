@@ -71,6 +71,9 @@ frm adopt scan             # 只读识别旧脚本和独立 Snell
 frm adopt report           # 生成可分享的脱敏清单
 frm adopt register         # 原地登记，不重启、不改配置
 frm adopt forget <实例>    # 只撤销登记，不影响原节点
+frm adopt takeover         # 备份后完整接管旧控制面
+frm adopt takeover-status  # 查看接管状态与备份校验
+frm adopt rollback         # 回滚最近一次完整接管
 ```
 
 ## 旧节点兼容接管
@@ -85,7 +88,17 @@ frm adopt forget <实例>    # 只撤销登记，不影响原节点
 FRM_ADOPT_SNELL_VERSION=6 frm adopt register
 ```
 
-完整 `takeover` 会在经过多台真实 VPS 的扫描验证后开放，并包含原管理器冻结、全量备份、健康检查和自动回滚。
+`takeover` 采用原地控制面接管：接管前逐实例检查，完整备份旧配置、二进制、systemd unit、frm 注册表和 root crontab；随后冻结旧管理器的自动任务并停用 `vless-watchdog`，但不重写协议配置、不改变端口和密钥，也不重启数据服务。接管后检查失败会自动恢复控制面。
+
+每次接管都会在 `/var/lib/frm-node/takeovers/<时间>/` 保存 `payload.tar.gz`、SHA-256、接管清单和接管前注册表。回滚命令恢复 cron、watchdog 与兼容登记状态，不重启协议服务：
+
+```bash
+frm adopt takeover-status
+frm adopt rollback [接管编号]
+```
+
+原地接管的共享核心继续禁止普通 `frm uninstall` 和盲目 `frm update`，后续应使用专门的来源适配更新流程。
+旧脚本会保留在备份和原路径中供回滚使用；接管后不要再手工运行旧脚本的安装、更新或卸载菜单，以免两个管理器同时改写配置。
 
 ## 文件布局
 

@@ -352,7 +352,9 @@ adopt_command() {
     report) adopt_report ;;
     register) adopt_register ;;
     forget) [[ -n ${2:-} ]] || die "请指定兼容接管实例。"; adopt_forget "$2" ;;
-    takeover) die "完整 takeover 尚未开放。请先运行 adopt register，并在各台 VPS 验证导出和诊断结果。" ;;
-    *) die "未知接管命令：$1。可用：scan、report、register、forget。" ;;
+    takeover) adopt_takeover ;;
+    rollback) adopt_takeover_rollback "${2:-}" ;;
+    takeover-status) adopt_takeover_status ;;
+    *) die "未知接管命令：$1。可用：scan、report、register、forget、takeover、rollback、takeover-status。" ;;
   esac
 }
