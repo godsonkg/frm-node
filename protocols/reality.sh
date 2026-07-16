@@ -43,7 +43,7 @@ protocol_install_reality() {
   jq -n \
     --argjson port "$port" --arg uuid "$uuid" --arg target "$target" \
     --arg privateKey "$private_key" --arg shortId "$short_id" \
-    '{log:{loglevel:"warning"},inbounds:[{listen:"0.0.0.0",port:$port,protocol:"vless",settings:{clients:[{id:$uuid,flow:"xtls-rprx-vision"}],decryption:"none"},streamSettings:{method:"raw",security:"reality",realitySettings:{show:false,target:($target+":443"),xver:0,serverNames:[$target],privateKey:$privateKey,shortIds:[$shortId],limitFallbackUpload:{afterBytes:0,bytesPerSec:1048576,burstBytesPerSec:2097152},limitFallbackDownload:{afterBytes:0,bytesPerSec:1048576,burstBytesPerSec:2097152}}}}],outbounds:[{protocol:"freedom",tag:"direct"},{protocol:"blackhole",tag:"block"}]}' \
+    '{log:{loglevel:"warning"},inbounds:[{listen:"0.0.0.0",port:$port,protocol:"vless",settings:{clients:[{id:$uuid,flow:"xtls-rprx-vision"}],decryption:"none"},streamSettings:{network:"raw",security:"reality",realitySettings:{show:false,target:($target+":443"),xver:0,serverNames:[$target],privateKey:$privateKey,shortIds:[$shortId],limitFallbackUpload:{afterBytes:0,bytesPerSec:1048576,burstBytesPerSec:2097152},limitFallbackDownload:{afterBytes:0,bytesPerSec:1048576,burstBytesPerSec:2097152}}}}],outbounds:[{protocol:"freedom",tag:"direct"},{protocol:"blackhole",tag:"block"}]}' \
     >"$config"
   chmod 0600 "$config"
   "$FRM_BIN_DIR/xray" run -test -config "$config"

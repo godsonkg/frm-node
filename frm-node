@@ -77,12 +77,13 @@ show_status() {
 }
 
 show_logs() {
-  local id=$1 follow=${2:-} service args=(--no-pager -n 100)
+  local id=$1 follow=${2:-} service units=() args=(--no-pager -n 100)
   registry_exists "$id" || die "实例不存在：$id"
   [[ $follow != --follow ]] || args=(-f)
   while IFS= read -r service; do
-    journalctl -u "$service" "${args[@]}"
+    units+=(-u "$service")
   done < <(instance_services "$id")
+  journalctl "${units[@]}" "${args[@]}"
 }
 
 install_menu() {
@@ -116,7 +117,8 @@ EOF
 }
 
 select_instance() {
-  registry_table
+  # 调用方以 $(select_instance) 捕获实例名，表格必须走 stderr 才能显示。
+  registry_table >&2
   ask_value "请输入实例名称"
 }
 
