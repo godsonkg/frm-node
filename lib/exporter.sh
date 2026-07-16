@@ -57,18 +57,21 @@ EOF
 }
 
 export_snell() {
-  local id=$1 name extras=''
+  local id=$1 name extras='' note='Snell 仅导出给 Surge。'
   load_credentials "$id"
   name="FRM-Snell-v$SNELL_VERSION"
-  if [[ ${MODE:-native} == shadowtls ]]; then
+  if [[ ${MODE:-native} == *shadowtls ]]; then
     name="$name-ShadowTLS"
     extras=", shadow-tls-password=$SHADOWTLS_PASSWORD, shadow-tls-sni=$SHADOWTLS_SNI, shadow-tls-version=3"
+    if [[ ${MODE:-} == legacy-shadowtls ]]; then
+      note='这是原节点的旧版 ShadowTLS 拓扑，frm-node 仅按现状兼容接管，没有主动改造。'
+    fi
   fi
   cat <<EOF
 --- Surge ---
 $name = snell, $SERVER_IPV4, $PORT, psk=$PSK, version=$SNELL_VERSION, reuse=true, tfo=true, ip-version=v4-only$extras
 
-说明：Snell 仅导出给 Surge。Snell v6 固定使用原生流量整形，不叠加 ShadowTLS。
+说明：$note 新建 Snell v6 仍固定使用官方原生流量整形，不叠加 ShadowTLS。
 EOF
 }
 
@@ -100,6 +103,41 @@ vless://$UUID@$SERVER_IPV4:$PORT?encryption=none&flow=xtls-rprx-vision&security=
 EOF
 }
 
+export_tuic() {
+  local id=$1 name="FRM-TUIC"
+  load_credentials "$id"
+  cat <<EOF
+--- Mihomo / OpenClash / FlClash ---
+- name: "$name"
+  type: tuic
+  server: $SERVER_IPV4
+  port: $PORT
+  uuid: $UUID
+  password: "$PASSWORD"
+  sni: $SNI
+  alpn: [h3]
+  disable-sni: false
+  reduce-rtt: true
+  udp-relay-mode: native
+  congestion-controller: bbr
+  skip-cert-verify: true
+
+--- 通用 URI ---
+tuic://$UUID:$PASSWORD@$SERVER_IPV4:$PORT?sni=$SNI&alpn=h3&allow_insecure=1&congestion_control=bbr#$name
+EOF
+}
+
+export_adopted_metadata() {
+  local id=$1
+  cat <<EOF
+该协议已纳入兼容接管，但 frm-node 当前还没有对应的客户端导出器。
+来源：$(registry_get "$id" '.source')
+协议：$(registry_get "$id" '.protocol')
+端口：$(registry_get "$id" '.port')/$(registry_get "$id" '.transport')
+原配置：$(registry_get "$id" '.config_file')
+EOF
+}
+
 export_instance() {
   local id=$1 protocol
   registry_exists "$id" || die "实例不存在：$id"
@@ -110,7 +148,10 @@ export_instance() {
     hysteria2) export_hysteria2 "$id" ;;
     snell4|snell5|snell6) export_snell "$id" ;;
     reality) export_reality "$id" ;;
-    *) die "尚未实现 $protocol 的导出器。" ;;
+    tuic) export_tuic "$id" ;;
+    *)
+      if registry_is_adopted "$id"; then export_adopted_metadata "$id"; else die "尚未实现 $protocol 的导出器。"; fi
+      ;;
   esac
   printf '================================================\n'
 }

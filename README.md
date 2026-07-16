@@ -67,7 +67,25 @@ frm update                  # 备份后更新已安装核心
 frm backup
 frm restore <备份文件>
 frm uninstall <实例>
+frm adopt scan             # 只读识别旧脚本和独立 Snell
+frm adopt report           # 生成可分享的脱敏清单
+frm adopt register         # 原地登记，不重启、不改配置
+frm adopt forget <实例>    # 只撤销登记，不影响原节点
 ```
+
+## 旧节点兼容接管
+
+当前可识别 `mack-a/v2ray-agent`、`chil30-group/vless-all-in-one`，以及常见官方 Snell 独立安装。`adopt register` 会保留原 IP、端口、凭据、核心、systemd 单元、证书和定时任务，只把节点登记到 frm-node，属于零中断的兼容接管。
+
+兼容接管实例可以统一查看、导出、诊断、启停和读取日志。为保护共用的 Xray/sing-box 核心，它们暂时不能由 `frm update` 覆盖，也不能通过普通 `uninstall` 删除。可使用 `frm adopt forget <实例>` 安全撤销登记。
+
+独立 Snell 如果无法从配置或二进制确定大版本，脚本会拒绝猜测。确认是 v6 后可执行：
+
+```bash
+FRM_ADOPT_SNELL_VERSION=6 frm adopt register
+```
+
+完整 `takeover` 会在经过多台真实 VPS 的扫描验证后开放，并包含原管理器冻结、全量备份、健康检查和自动回滚。
 
 ## 文件布局
 

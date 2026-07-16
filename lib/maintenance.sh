@@ -43,14 +43,16 @@ update_core() {
   esac
   unset FRM_FORCE_DOWNLOAD
   while IFS= read -r id; do
+    registry_is_adopted "$id" && continue
     instance_service_action "$id" restart || failed=1
-  done < <(jq -r --arg p "$protocol_filter" 'select(.protocol == $p) | .id' "$FRM_REGISTRY_DIR"/*.json 2>/dev/null || true)
+  done < <(jq -r --arg p "$protocol_filter" 'select(.protocol == $p and (.ownership // "frm") == "frm") | .id' "$FRM_REGISTRY_DIR"/*.json 2>/dev/null || true)
   if (( failed )); then
     warn "$core 更新后服务异常，正在回滚。"
     mv -f "$backup" "$binary"
     while IFS= read -r id; do
+      registry_is_adopted "$id" && continue
       instance_service_action "$id" restart || true
-    done < <(jq -r --arg p "$protocol_filter" 'select(.protocol == $p) | .id' "$FRM_REGISTRY_DIR"/*.json 2>/dev/null || true)
+    done < <(jq -r --arg p "$protocol_filter" 'select(.protocol == $p and (.ownership // "frm") == "frm") | .id' "$FRM_REGISTRY_DIR"/*.json 2>/dev/null || true)
     return 1
   fi
   rm -f "$backup"
@@ -74,6 +76,9 @@ update_installed_cores() {
 remove_instance() {
   local id=$1 port transport service config credential
   registry_exists "$id" || die "实例不存在：$id"
+  if registry_is_adopted "$id"; then
+    die "该实例来自兼容接管。为避免误删原脚本的共用核心，当前不能卸载；可删除登记或完成 takeover 后再操作。"
+  fi
   port=$(registry_get "$id" '.port')
   transport=$(registry_get "$id" '.transport')
   config=$(registry_get "$id" '.config_file')

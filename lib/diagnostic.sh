@@ -6,6 +6,9 @@ doctor_instance() {
   port=$(registry_get "$id" '.port')
   transport=$(registry_get "$id" '.transport')
   printf '\n[%s] %s\n' "$id" "$protocol"
+  if registry_is_adopted "$id"; then
+    printf '  [信息] 兼容接管自 %s；原服务和配置保持不变\n' "$(registry_get "$id" '.source')"
+  fi
   while IFS= read -r service; do
     state=$(systemctl is-active "$service" 2>/dev/null || true)
     if [[ $state == active ]]; then
@@ -48,4 +51,3 @@ doctor_all() {
   printf '\n诊断完成：%d 个实例，%d 个存在异常。\n' "$total" "$failed"
   (( failed == 0 ))
 }
-
