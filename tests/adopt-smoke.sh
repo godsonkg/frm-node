@@ -34,7 +34,10 @@ mkdir -p "$FRM_ADOPT_ROOT/etc/vless-reality" \
 
 cat >"$FRM_ADOPT_ROOT/etc/vless-reality/db.json" <<'EOF'
 {
-  "xray": {"vless":{"uuid":"11111111-1111-4111-8111-111111111111","port":443,"public_key":"pub","short_id":"a1b2","sni":"www.example.com"}},
+  "xray": {
+    "vless":{"uuid":"11111111-1111-4111-8111-111111111111","port":443,"public_key":"pub","short_id":"a1b2","sni":"www.example.com"},
+    "trojan":{"password":"trojan-pass","port":2096,"sni":"trojan.example.com"}
+  },
   "singbox": {
     "hy2":{"password":"hy-pass","port":8443,"sni":"hy.example.com"},
     "snell-v5":{"psk":"snell-five-password","port":9443,"version":"5"}
@@ -63,19 +66,22 @@ EOF
 scan=$(adopt_scan_raw)
 grep -q $'vless-all-in-one\treality\t443' <<<"$scan"
 grep -q $'vless-all-in-one\thysteria2\t8443' <<<"$scan"
+grep -q $'vless-all-in-one\ttrojan\t2096' <<<"$scan"
 grep -q $'v2ray-agent\tanytls\t10443' <<<"$scan"
 grep -q $'manual-snell\tsnell6+ShadowTLS(旧拓扑)\t21443' <<<"$scan"
 
 adopt_register
-[[ $(registry_ids | wc -l) -eq 5 ]]
+[[ $(registry_ids | wc -l) -eq 6 ]]
 jq -e '.ownership=="adopted" and .read_only==true' "$FRM_REGISTRY_DIR/adopt-vless-all-in-one-reality-443.json" >/dev/null
 grep -q '^UUID=' "$FRM_INSTANCE_DIR/adopt-vless-all-in-one-reality-443.env"
 grep -q 'type: anytls' < <(export_instance adopt-v2ray-agent-anytls-10443)
+grep -q 'type: trojan' < <(export_instance adopt-vless-all-in-one-trojan-2096)
+grep -q 'password: "trojan-pass"' < <(export_instance adopt-vless-all-in-one-trojan-2096)
 grep -q 'version=6' < <(export_instance adopt-manual-snell-snell6-21443)
 grep -q 'shadow-tls-password=shadow-password' < <(export_instance adopt-manual-snell-snell6-21443)
 
 # Re-running registration must be idempotent.
 adopt_register >/dev/null
-[[ $(registry_ids | wc -l) -eq 5 ]]
+[[ $(registry_ids | wc -l) -eq 6 ]]
 
 echo "adoption smoke tests passed"

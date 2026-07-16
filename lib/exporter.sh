@@ -127,6 +127,31 @@ tuic://$UUID:$PASSWORD@$SERVER_IPV4:$PORT?sni=$SNI&alpn=h3&allow_insecure=1&cong
 EOF
 }
 
+export_trojan() {
+  local id=$1 name="FRM-Trojan"
+  load_credentials "$id"
+  cat <<EOF
+--- Mihomo / OpenClash / FlClash ---
+- name: "$name"
+  type: trojan
+  server: $SERVER_IPV4
+  port: $PORT
+  password: "$PASSWORD"
+  sni: $SNI
+  udp: true
+  skip-cert-verify: true
+
+--- Surge ---
+$name = trojan, $SERVER_IPV4, $PORT, password=$PASSWORD, sni=$SNI, skip-cert-verify=true, ip-version=v4-only
+
+--- Loon ---
+$name = trojan, $SERVER_IPV4, $PORT, "$PASSWORD", sni=$SNI, skip-cert-verify=true, udp=true
+
+--- 通用 URI ---
+trojan://$PASSWORD@$SERVER_IPV4:$PORT?sni=$SNI&allowInsecure=1#$name
+EOF
+}
+
 export_adopted_metadata() {
   local id=$1
   cat <<EOF
@@ -149,6 +174,7 @@ export_instance() {
     snell4|snell5|snell6) export_snell "$id" ;;
     reality) export_reality "$id" ;;
     tuic) export_tuic "$id" ;;
+    trojan) export_trojan "$id" ;;
     *)
       if registry_is_adopted "$id"; then export_adopted_metadata "$id"; else die "尚未实现 $protocol 的导出器。"; fi
       ;;

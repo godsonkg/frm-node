@@ -238,6 +238,9 @@ adopt_register_vless_all_in_one() {
       anytls)
         adopt_register_record vless-all-in-one "$proto" "$port" "$transport" "$service" "$db" /usr/local/bin/anytls-server /etc/vless-reality/vless-server.sh \
           PASSWORD "$(jq -r '.password // empty' <<<"$json")" SNI "$(jq -r '.sni // empty' <<<"$json")" ;;
+      trojan)
+        adopt_register_record vless-all-in-one "$proto" "$port" "$transport" "$service" "$db" /usr/local/bin/xray /etc/vless-reality/vless-server.sh \
+          PASSWORD "$(jq -r '.password // empty' <<<"$json")" SNI "$(jq -r '.sni // empty' <<<"$json")" ;;
       tuic)
         adopt_register_record vless-all-in-one "$proto" "$port" "$transport" "$service" "$db" /usr/local/bin/sing-box /etc/vless-reality/vless-server.sh \
           UUID "$(jq -r '.uuid // empty' <<<"$json")" PASSWORD "$(jq -r '.password // empty' <<<"$json")" SNI "$(jq -r '.sni // empty' <<<"$json")" ;;
