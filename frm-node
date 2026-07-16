@@ -17,6 +17,7 @@ source "$FRM_HOME/lib/diagnostic.sh"
 source "$FRM_HOME/lib/maintenance.sh"
 source "$FRM_HOME/lib/adopt.sh"
 source "$FRM_HOME/lib/takeover.sh"
+source "$FRM_HOME/lib/watch.sh"
 source "$FRM_HOME/protocols/anytls.sh"
 source "$FRM_HOME/protocols/hysteria2.sh"
 source "$FRM_HOME/protocols/reality.sh"
@@ -45,6 +46,11 @@ frm-node 中文节点管理器
   frm adopt forget 实例       仅删除接管登记
   frm adopt takeover          完整接管旧节点控制面
   frm adopt rollback          回滚最近一次完整接管
+  frm watch setup             配置 Telegram 推送监控
+  frm watch status|test|run   监控状态 / 测试推送 / 手动巡检
+  frm watch accept-ports      接受当前监听端口为新基线
+  frm watch accept-cron       接受当前 crontab 为新基线
+  frm watch off|on            停用 / 启用定时巡检
   frm version                 查看版本
 
 协议名称：reality、anytls、hysteria2、snell4、snell4-shadowtls、
@@ -186,5 +192,6 @@ case $command in
   uninstall) [[ -n ${2:-} ]] || die "请指定实例名称。"; remove_instance "$2" ;;
   migrate) migrate_legacy ;;
   adopt) adopt_command "${2:-scan}" "${3:-}" ;;
+  watch) watch_command "${2:-status}" ;;
   *) usage; die "未知命令：$command" ;;
 esac

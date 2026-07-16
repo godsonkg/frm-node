@@ -22,3 +22,5 @@ jobs:
         run: bash tests/smoke.sh
       - name: Adoption compatibility test
         run: bash tests/adopt-smoke.sh
+      - name: Watch monitoring test
+        run: bash tests/watch-smoke.sh

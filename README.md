@@ -80,6 +80,12 @@ frm adopt forget <实例>    # 只撤销登记，不影响原节点
 frm adopt takeover         # 备份后完整接管旧控制面
 frm adopt takeover-status  # 查看接管状态与备份校验
 frm adopt rollback         # 回滚最近一次完整接管
+frm watch setup            # 配置 Telegram 推送监控
+frm watch status           # 查看监控状态（Token 打码显示）
+frm watch test             # 发送测试推送
+frm watch accept-ports     # 自装新服务后更新端口基线
+frm watch accept-cron      # 自改 crontab 后更新基线
+frm watch off / on         # 停用 / 启用定时巡检
 ```
 
 ## 旧节点兼容接管
@@ -105,6 +111,22 @@ frm adopt rollback [接管编号]
 
 原地接管的共享核心继续禁止普通 `frm uninstall` 和盲目 `frm update`，后续应使用专门的来源适配更新流程。
 旧脚本会保留在备份和原路径中供回滚使用；接管后不要再手工运行旧脚本的安装、更新或卸载菜单，以免两个管理器同时改写配置。
+
+## 推送监控（frm watch）
+
+`frm watch` 是零暴露面的 Telegram 推送监控：无监听端口、无常驻进程、无 Web 面板，由 systemd timer 周期拉起一次巡检后立即退出（默认 5 分钟一轮）。
+
+监控内容：
+
+- 实例服务与端口健康，异常即时告警、恢复自动通知（同一问题 6 小时内不重复推送）
+- 磁盘占用（85% 提醒 / 95% 严重）
+- 月流量用量（需安装 vnstat 并在配置中填写配额，80%/95% 各提醒一次）
+- 每次 SSH 登录成功即推送来源 IP（可配置已知 IP 白名单减噪）
+- 基线外新增监听端口告警（疑似后门植入）
+- root crontab 内容变化告警（疑似持久化后门）
+- 每日固定时刻推送巡检日报
+
+安全约束：Bot Token 只保存在 `/etc/frm-node/watch.env`（600）；推送消息永不包含密码、PSK、UUID、私钥或订阅地址，默认不包含端口号。配置走 `frm watch setup` 交互完成，请勿把 Token 粘贴到聊天或截图。
 
 ## 文件布局
 
