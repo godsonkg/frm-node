@@ -58,7 +58,9 @@ grep -q 'major == 6 &&.*mode == shadowtls' "$ROOT/protocols/snell.sh"
 grep -q 'Snell v6 使用原生流量整形' "$ROOT/protocols/snell.sh"
 
 # ShadowTLS 密码只能经 EnvironmentFile 注入，不得明文写入 unit。
+# shellcheck disable=SC2016  # 故意匹配源码中的字面量 $ 变量名
 if grep -qF -- '--password $stls_password' "$ROOT/protocols/snell.sh"; then exit 1; fi
+# shellcheck disable=SC2016  # 故意匹配源码中的字面量 ${} 引用
 grep -qF -- '--password \${SHADOWTLS_PASSWORD}' "$ROOT/protocols/snell.sh"
 
 # Reality 的传输层键名必须是 network（method 会被 Xray 静默忽略）。
