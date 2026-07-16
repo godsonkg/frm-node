@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 protocol_install_hysteria2() {
-  local id port password sni ip service credential config cert key obfs_password=''
+  local id port password sni ip service credential config cert key obfs_password='' fingerprint
   id=$(unique_instance_id hysteria2)
   port=$(ask_value "Hysteria2 UDP 端口" "$(random_port udp)")
   validate_port "$port"
@@ -24,6 +24,9 @@ protocol_install_hysteria2() {
     -keyout "$key" -out "$cert" -subj "/CN=$sni" \
     -addext "subjectAltName=DNS:$sni" >/dev/null 2>&1
   chmod 0600 "$key" "$cert"
+  # 记录证书 SHA-256 指纹，导出时供客户端钉扎，防止跳过 CA 验证后被中间人钓走密码。
+  fingerprint=$(openssl x509 -noout -fingerprint -sha256 -in "$cert" | cut -d= -f2)
+  [[ -n $fingerprint ]] || die "无法计算自签证书指纹。"
   {
     printf 'listen: 0.0.0.0:%s\n' "$port"
     printf 'tls:\n  cert: %s\n  key: %s\n' "$cert" "$key"
@@ -34,7 +37,7 @@ protocol_install_hysteria2() {
     printf 'masquerade:\n  type: proxy\n  proxy:\n    url: https://www.apple.com/\n    rewriteHost: true\n'
   } >"$config"
   chmod 0600 "$config"
-  write_credentials "$id" SERVER_IPV4 "$ip" PORT "$port" PASSWORD "$password" SNI "$sni" OBFS_PASSWORD "$obfs_password"
+  write_credentials "$id" SERVER_IPV4 "$ip" PORT "$port" PASSWORD "$password" SNI "$sni" OBFS_PASSWORD "$obfs_password" FINGERPRINT "$fingerprint"
   write_service_unit "$service" "frm-node Hysteria2 ($id)" \
     "$FRM_BIN_DIR/hysteria server -c $config" "" "$FRM_INSTANCE_DIR"
   enable_service_checked "$service" udp "$port"

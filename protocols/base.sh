@@ -106,8 +106,23 @@ ensure_snell_binary() {
   url="https://dl.nssurge.com/snell/snell-server-v${version}-linux-${upstream_arch}.zip"
   archive=$(mktemp --suffix=.zip)
   download_file "$url" "$archive"
+  verify_pinned_sha256 "$archive" "SNELL${major}_SHA256_${upstream_arch^^}" "Snell v$major"
   install_zip_binary "$archive" snell-server "$destination"
   rm -f "$archive" "$archive.sha256"
+}
+
+# 若 versions.env 提供了对应校验和则强制比对；留空只提示，方便首次可信下载后钉扎。
+verify_pinned_sha256() {
+  local file=$1 var_name=$2 label=$3 expected
+  expected=${!var_name:-}
+  if [[ -z $expected ]]; then
+    warn "versions.env 未提供 $var_name，本次跳过校验；可将日志中的 SHA-256 填入后钉扎。"
+    return 0
+  fi
+  if ! printf '%s  %s\n' "$expected" "$file" | sha256sum -c - >/dev/null 2>&1; then
+    die "$label 下载文件与 versions.env 中钉扎的 SHA-256 不匹配，已停止安装。"
+  fi
+  info "$label 下载校验通过。"
 }
 
 ensure_shadowtls_binary() {

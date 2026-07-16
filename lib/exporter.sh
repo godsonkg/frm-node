@@ -25,8 +25,14 @@ EOF
 }
 
 export_hysteria2() {
-  local id=$1 name="FRM-Hy2" obfs_uri='' obfs_yaml='' obfs_surge='' loon_output
+  local id=$1 name="FRM-Hy2" obfs_uri='' obfs_yaml='' obfs_surge='' loon_output pin_yaml='' pin_uri=''
+  # 先声明为空，避免 export_all 时沿用上一个实例残留的同名变量。
+  local OBFS_PASSWORD='' FINGERPRINT=''
   load_credentials "$id"
+  if [[ -n ${FINGERPRINT:-} ]]; then
+    pin_yaml=$'\n  fingerprint: "'$FINGERPRINT'"'
+    pin_uri="&pinSHA256=$FINGERPRINT"
+  fi
   if [[ -n ${OBFS_PASSWORD:-} ]]; then
     obfs_uri="&obfs=salamander&obfs-password=$OBFS_PASSWORD"
     obfs_yaml=$'\n  obfs: salamander\n  obfs-password: "'$OBFS_PASSWORD'"'
@@ -43,7 +49,7 @@ export_hysteria2() {
   port: $PORT
   password: "$PASSWORD"
   sni: $SNI
-  skip-cert-verify: true$obfs_yaml
+  skip-cert-verify: true$pin_yaml$obfs_yaml
 
 --- Surge ---
 $name = hysteria2, $SERVER_IPV4, $PORT, password=$PASSWORD, ip-version=v4-only, ecn=true, skip-cert-verify=true, sni=$SNI$obfs_surge
@@ -52,7 +58,7 @@ $name = hysteria2, $SERVER_IPV4, $PORT, password=$PASSWORD, ip-version=v4-only, 
 $loon_output
 
 --- 通用 URI ---
-hysteria2://$PASSWORD@$SERVER_IPV4:$PORT/?sni=$SNI&insecure=1$obfs_uri#$name
+hysteria2://$PASSWORD@$SERVER_IPV4:$PORT/?sni=$SNI&insecure=1$pin_uri$obfs_uri#$name
 EOF
 }
 

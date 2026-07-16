@@ -4,17 +4,21 @@ backup_all() {
   local timestamp archive
   timestamp=$(date +%Y%m%d-%H%M%S)
   archive="$FRM_BACKUP_DIR/frm-node-$timestamp.tar.gz"
-  tar -C / --wildcards --ignore-failed-read --exclude='var/lib/frm-node/backups' -czf "$archive" \
+  # takeovers 目录本身就是独立备份，不再重复打包，避免体积滚雪球。
+  tar -C / --wildcards --ignore-failed-read \
+    --exclude='var/lib/frm-node/backups' --exclude='var/lib/frm-node/takeovers' -czf "$archive" \
     etc/frm-node var/lib/frm-node 'etc/systemd/system/frm-*.service' 2>/dev/null || {
       rm -f "$archive"
       die "备份失败。"
     }
   chmod 0600 "$archive"
+  # 只保留最近 7 份日常备份，防止无限累积占满磁盘。
+  find "$FRM_BACKUP_DIR" -maxdepth 1 -type f -name 'frm-node-*.tar.gz' | sort | head -n -7 | xargs -r rm -f --
   ok "备份完成：$archive"
 }
 
 restore_backup() {
-  local archive=${1:-} id
+  local archive=${1:-} id service
   [[ -n $archive ]] || archive=$(find "$FRM_BACKUP_DIR" -maxdepth 1 -type f -name 'frm-node-*.tar.gz' | sort | tail -n 1)
   [[ -r $archive ]] || die "找不到备份文件。"
   tar -tzf "$archive" >/dev/null || die "备份压缩包损坏。"
@@ -22,6 +26,14 @@ restore_backup() {
   tar -C / -xzf "$archive"
   systemctl daemon-reload
   while IFS= read -r id; do
+    # 接管实例的共享旧核心不属于本备份范围，恢复时不动它们的服务。
+    if registry_is_external "$id"; then
+      warn "跳过接管实例 $id 的服务重启；如有需要请单独处理。"
+      continue
+    fi
+    while IFS= read -r service; do
+      systemctl enable "$service" >/dev/null 2>&1 || true
+    done < <(instance_services "$id")
     instance_service_action "$id" restart
   done < <(registry_ids)
   doctor_all

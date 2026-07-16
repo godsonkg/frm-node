@@ -54,8 +54,10 @@ protocol_install_snell() {
     "$FRM_BIN_DIR/snell-server-v$major -c $config" "" "$config"
   enable_service_checked "$service" tcp "$listen_port"
   if [[ $mode == shadowtls ]]; then
+    # 密码经 EnvironmentFile(0600) 注入，不明文写入 0644 的 unit 文件。
     write_service_unit "$stls_service" "frm-node ShadowTLS v3 for Snell v$major ($id)" \
-      "$FRM_BIN_DIR/shadow-tls --fastopen --v3 server --listen 0.0.0.0:$port --server 127.0.0.1:$listen_port --tls $stls_sni:443 --password $stls_password"
+      "$FRM_BIN_DIR/shadow-tls --fastopen --v3 server --listen 0.0.0.0:\${PORT} --server 127.0.0.1:\${INTERNAL_PORT} --tls $stls_sni:443 --password \${SHADOWTLS_PASSWORD}" \
+      "$credential"
     enable_service_checked "$stls_service" tcp "$port"
   fi
   firewall_open "$port" tcp "frm-node Snell v$major"
