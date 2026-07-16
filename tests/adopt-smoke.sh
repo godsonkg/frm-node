@@ -116,7 +116,8 @@ grep -q 'keep-this-job' "$MOCK_CRON"
 if grep -q 'v2ray-agent/install.sh' "$MOCK_CRON"; then exit 1; fi
 takeover_dir=$(takeover_latest_dir)
 (cd "$takeover_dir" && sha256sum -c payload.sha256 >/dev/null)
-adopt_takeover_status | grep -q '状态：active'
+takeover_status=$(adopt_takeover_status)
+grep -q '状态：active' <<<"$takeover_status"
 
 adopt_takeover_rollback >/dev/null
 [[ $(registry_get adopt-vless-all-in-one-reality-443 '.ownership') == adopted ]]
