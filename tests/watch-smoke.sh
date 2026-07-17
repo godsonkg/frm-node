@@ -123,14 +123,19 @@ watch_check_ssh
 WATCH_SSH_KNOWN_IPS=''
 
 # ---------- 端口基线 ----------
+export WATCH_EPHEMERAL_LOW=32768   # 固定临时端口下界，保证各环境行为一致
 printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\n' >"$TMP/ss.all.out"
 watch_check_ports   # 首轮建基线
 [[ $(sent_count '新监听端口') -eq 0 ]]
-printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 127.0.0.1:9999 0.0.0.0:*\n' >"$TMP/ss.all.out"
+# 新端口第一轮只挂起，第二轮确认才告警。
+printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 127.0.0.1:9999 0.0.0.0:* users:(("nc",pid=7,fd=3))\n' >"$TMP/ss.all.out"
+watch_check_ports
+[[ $(sent_count '新监听端口') -eq 0 ]]
 watch_check_ports
 [[ $(sent_count '新监听端口') -eq 1 ]]
 grep -q 'tcp/9999' "$CURL_LOG"
 watch_accept_ports
+watch_check_ports
 watch_check_ports
 [[ $(sent_count '新监听端口') -eq 1 ]]
 # 注册表内实例端口不算异常：新增 443/udp 之外的注册端口。
@@ -138,7 +143,37 @@ write_credentials test-b SERVER_IPV4 192.0.2.10 PORT 8443 PASSWORD p SNI e.com O
 registry_write test-b hysteria2 Hysteria2 8443 udp test "$(credential_path test-b)" "" frm-test-b.service
 printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 127.0.0.1:9999 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:8443 0.0.0.0:*\n' >"$TMP/ss.all.out"
 watch_check_ports
+watch_check_ports
 [[ $(sent_count '新监听端口') -eq 1 ]]
+# 已知核心的 UDP 临时端口是中转套接字（QUIC/HTTP3），不算新监听面。
+printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 127.0.0.1:9999 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:8443 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:45694 0.0.0.0:* users:(("xray",pid=11,fd=9))\nudp UNCONN 0 0 [::]:51947 [::]:* users:(("sing-box",pid=12,fd=4))\n' >"$TMP/ss.all.out"
+watch_check_ports
+watch_check_ports
+[[ $(sent_count '新监听端口') -eq 1 ]]
+# 未知进程占用 UDP 临时端口仍要告警（两轮确认后）。
+rm -f "$FRM_WATCH_STATE/alerts/ports"
+printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 127.0.0.1:9999 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:8443 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:45694 0.0.0.0:* users:(("evil",pid=13,fd=9))\n' >"$TMP/ss.all.out"
+watch_check_ports
+[[ $(sent_count '新监听端口') -eq 1 ]]
+watch_check_ports
+[[ $(sent_count '新监听端口') -eq 2 ]]
+grep -q 'udp/45694' "$CURL_LOG"
+# 临时端口下界以下的 UDP 新端口不受进程过滤豁免，两轮确认后照样告警。
+rm -f "$FRM_WATCH_STATE/alerts/ports"
+printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 127.0.0.1:9999 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:8443 0.0.0.0:*\nudp UNCONN 0 0 0.0.0.0:999 0.0.0.0:* users:(("xray",pid=11,fd=9))\n' >"$TMP/ss.all.out"
+watch_check_ports
+watch_check_ports
+[[ $(sent_count '新监听端口') -eq 3 ]]
+grep -q 'udp/999' "$CURL_LOG"
+# 瞬时端口：只出现一轮就消失，不告警；已告警的端口消失后推恢复。
+watch_accept_ports
+printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:777 0.0.0.0:* users:(("mystery",pid=14,fd=2))\n' >"$TMP/ss.all.out"
+watch_check_ports   # 第一轮：仅挂起
+printf 'tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*\ntcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*\n' >"$TMP/ss.all.out"
+watch_check_ports   # 第二轮：端口已消失
+[[ $(sent_count '新监听端口') -eq 3 ]]
+[[ $(sent_count '回到基线') -eq 0 ]]
+unset WATCH_EPHEMERAL_LOW
 
 # ---------- crontab 基线 ----------
 printf '15 4 * * * echo ok\n' >"$TMP/cron.out"

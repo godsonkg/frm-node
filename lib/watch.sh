@@ -184,14 +184,40 @@ watch_check_ssh() {
   return 0
 }
 
+watch_ephemeral_low() {
+  local low=${WATCH_EPHEMERAL_LOW:-}
+  [[ $low =~ ^[0-9]+$ ]] || low=$(awk '{print $1}' /proc/sys/net/ipv4/ip_local_port_range 2>/dev/null || true)
+  [[ $low =~ ^[0-9]+$ ]] || low=32768
+  printf '%s\n' "$low"
+}
+
+# 已知代理核心中转 UDP 流量（QUIC/HTTP3 等）时会打开临时出站套接字，
+# ss -lnu 会把它们列成"监听"。把临时端口段内、属主为已知核心的 UDP 套接字
+# 排除出快照，否则节点每转发一波 UDP 流量就会误报一次"疑似后门"。
 watch_ports_snapshot() {
-  ss -H -lntu 2>/dev/null |
-    awk '{n=split($5,a,":"); if (a[n] ~ /^[0-9]+$/) print tolower($1)"/"a[n]}' |
+  local low relay
+  low=$(watch_ephemeral_low)
+  relay=${WATCH_UDP_RELAY_PROCS:-xray,sing-box,anytls-server,snell-server,hysteria,shadow-tls,v2ray}
+  ss -H -lntup 2>/dev/null |
+    awk -v low="$low" -v relay="$relay" '
+      {
+        n = split($5, a, ":")
+        if (a[n] !~ /^[0-9]+$/) next
+        proto = tolower($1)
+        if (proto == "udp" && a[n] + 0 >= low) {
+          m = split(relay, procs, ",")
+          for (i = 1; i <= m; i++) {
+            if (procs[i] != "" && index($0, "\"" procs[i] "\"") > 0) next
+          }
+        }
+        print proto "/" a[n]
+      }' |
     sort -u
 }
 
 watch_check_ports() {
-  local baseline="$FRM_WATCH_STATE/ports.baseline" current allowed new_ports id
+  local baseline="$FRM_WATCH_STATE/ports.baseline" pending="$FRM_WATCH_STATE/ports.pending"
+  local current allowed new_ports confirmed='' id
   current=$(watch_ports_snapshot)
   if [[ ! -f $baseline ]]; then
     printf '%s\n' "$current" >"$baseline"
@@ -207,11 +233,22 @@ watch_check_ports() {
     done < <(registry_ids)
   )
   new_ports=$(comm -23 <(printf '%s\n' "$current" | sort -u) <(printf '%s\n' "$allowed" | sort -u))
+  # 新端口需连续两轮巡检都出现才告警：瞬时套接字（UDP 中转残留、扫描应答）
+  # 会自然消退；真正驻留的后门监听下一轮照样被抓到，最多晚一个巡检周期。
+  if [[ -n $new_ports && -f $pending ]]; then
+    confirmed=$(comm -12 <(printf '%s\n' "$new_ports") <(sort -u "$pending"))
+  fi
   if [[ -n $new_ports ]]; then
-    watch_alert ports "🚨 发现基线外的新监听端口：
-$new_ports
-如果是你自己安装的服务，请运行 frm watch accept-ports 更新基线；否则请立即排查是否被植入后门。"
+    printf '%s\n' "$new_ports" >"$pending"
+    chmod 0600 "$pending"
   else
+    rm -f "$pending"
+  fi
+  if [[ -n $confirmed ]]; then
+    watch_alert ports "🚨 发现基线外的新监听端口（已连续两轮确认）：
+$confirmed
+如果是你自己安装的服务，请运行 frm watch accept-ports 更新基线；否则请立即排查是否被植入后门。"
+  elif [[ -z $new_ports ]]; then
     watch_resolve ports "✅ 监听端口已回到基线范围。"
   fi
   return 0
@@ -400,7 +437,7 @@ watch_accept_ports() {
   watch_state_init
   watch_ports_snapshot >"$FRM_WATCH_STATE/ports.baseline"
   chmod 0600 "$FRM_WATCH_STATE/ports.baseline"
-  rm -f "$FRM_WATCH_STATE/alerts/ports"
+  rm -f "$FRM_WATCH_STATE/alerts/ports" "$FRM_WATCH_STATE/ports.pending"
   ok "已把当前监听端口设为新基线。"
 }
 
