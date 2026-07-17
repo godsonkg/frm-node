@@ -87,6 +87,7 @@ frm watch accept-ports     # 自装新服务后更新端口基线
 frm watch accept-cron      # 自改 crontab 后更新基线
 frm watch off / on         # 停用 / 启用定时巡检
 frm sub fragment           # 生成 Surge/Loon/Mihomo 干净片段
+frm sub check              # 自动生成并脱敏检查权限、结构、数量和协议跳过
 frm sub status             # 查看片段文件状态
 ```
 
@@ -136,6 +137,7 @@ frm adopt rollback [接管编号]
 
 ```bash
 frm sub fragment --prefix US-EXAMPLE
+frm sub check --prefix US-EXAMPLE
 frm sub status
 ```
 

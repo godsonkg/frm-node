@@ -55,6 +55,7 @@ frm-node 中文节点管理器
   frm sub fragment            生成三种客户端的干净节点片段
   frm sub fragment --format surge|loon|mihomo --stdout
                               经 SSH 输出指定格式片段
+  frm sub check [--prefix 名称] 自动生成并脱敏检查权限、结构和协议跳过
   frm sub status              查看本机片段文件状态
   frm version                 查看版本
 
