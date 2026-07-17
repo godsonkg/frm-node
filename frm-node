@@ -18,6 +18,7 @@ source "$FRM_HOME/lib/maintenance.sh"
 source "$FRM_HOME/lib/adopt.sh"
 source "$FRM_HOME/lib/takeover.sh"
 source "$FRM_HOME/lib/watch.sh"
+source "$FRM_HOME/lib/subscription.sh"
 source "$FRM_HOME/protocols/anytls.sh"
 source "$FRM_HOME/protocols/hysteria2.sh"
 source "$FRM_HOME/protocols/reality.sh"
@@ -51,6 +52,10 @@ frm-node 中文节点管理器
   frm watch accept-ports      接受当前监听端口为新基线
   frm watch accept-cron       接受当前 crontab 为新基线
   frm watch off|on            停用 / 启用定时巡检
+  frm sub fragment            生成三种客户端的干净节点片段
+  frm sub fragment --format surge|loon|mihomo --stdout
+                              经 SSH 输出指定格式片段
+  frm sub status              查看本机片段文件状态
   frm version                 查看版本
 
 协议名称：reality、anytls、hysteria2、snell4、snell4-shadowtls、
@@ -193,5 +198,6 @@ case $command in
   migrate) migrate_legacy ;;
   adopt) adopt_command "${2:-scan}" "${3:-}" ;;
   watch) watch_command "${2:-status}" ;;
+  sub) sub_command "${2:-status}" "${@:3}" ;;
   *) usage; die "未知命令：$command" ;;
 esac

@@ -86,6 +86,8 @@ frm watch test             # 发送测试推送
 frm watch accept-ports     # 自装新服务后更新端口基线
 frm watch accept-cron      # 自改 crontab 后更新基线
 frm watch off / on         # 停用 / 启用定时巡检
+frm sub fragment           # 生成 Surge/Loon/Mihomo 干净片段
+frm sub status             # 查看片段文件状态
 ```
 
 ## 旧节点兼容接管
@@ -128,6 +130,47 @@ frm adopt rollback [接管编号]
 
 安全约束：Bot Token 只保存在 `/etc/frm-node/watch.env`（600）；推送消息永不包含密码、PSK、UUID、私钥或订阅地址，默认不包含端口号。配置走 `frm watch setup` 交互完成，请勿把 Token 粘贴到聊天或截图。
 
+## 私有订阅 Phase 1（零新增暴露面）
+
+每台 VPS 可生成 Surge、Loon、Mihomo 三种干净节点片段。片段不含 `frm show` 的分节标题、提示横幅和说明文字：
+
+```bash
+frm sub fragment --prefix US-EXAMPLE
+frm sub status
+```
+
+文件保存在 `/var/lib/frm-node/sub/`，目录权限 `700`、文件权限 `600`。经 SSH 拉取时必须指定一种格式：
+
+```bash
+frm sub fragment --format surge --prefix US-EXAMPLE --stdout
+frm sub fragment --format loon --prefix US-EXAMPLE --stdout
+frm sub fragment --format mihomo --prefix US-EXAMPLE --stdout
+```
+
+默认名称为 `<机器前缀>-<协议>`。为兼容现有精调配置的旧节点名，可只导出一个实例并指定精确名称：
+
+```bash
+frm sub fragment --format surge --stdout \
+  --instance frm-anytls-443 --name 'US-EXAMPLE-AnyTLS'
+```
+
+客户端支持按现有导出器能力严格处理：AnyTLS、Trojan 可输出三种格式；Hysteria2 通常可输出三种格式，但启用 Salamander 时不生成不确定的 Loon 单行；Reality 输出 Loon/Mihomo；Snell 只输出 Surge；TUIC 当前只输出 Mihomo。不能确认兼容的组合会跳过并在 stderr 给出数量提示。
+
+家里电脑可用 Git Bash 汇总多台 VPS。真实 SSH 地址和节点别名不要提交仓库，先从脱敏示例复制到仓库外：
+
+```bash
+cp examples/sub-hosts.example.tsv /安全位置/hosts.tsv
+cp examples/sub-aliases.example.tsv /安全位置/aliases.tsv
+bash tools/frm-sub-collect.sh \
+  --inventory /安全位置/hosts.tsv \
+  --aliases /安全位置/aliases.tsv \
+  --output /安全位置/frm-sub-output
+```
+
+汇总器同时生成两套产物：`providers/` 是 Surge `policy-path`、Loon 待实机导入验证的纯节点列表和 Mihomo proxy-provider 使用的节点集合；`snippets/` 带 `[Proxy]` 或 `proxies:` 外壳，供嵌入手工精调配置。它会在写入前拒绝重复节点名，但不会修改现有配置、策略组或规则。
+
+Phase 1 只复用现有 SSH，不增加监听端口。所有产物都含完整节点凭据，禁止上传公开 Git、网盘或聊天。HTTPS 自动订阅属于 Phase 2，必须在 Phase 1 实测稳定后另行部署。
+
 ## 文件布局
 
 ```text
@@ -136,6 +179,7 @@ frm adopt rollback [接管编号]
 /var/lib/frm-node/bin/         协议核心
 /var/lib/frm-node/instances/   JSON 实例注册表
 /var/lib/frm-node/backups/     本机备份
+/var/lib/frm-node/sub/         本机订阅片段（700/600）
 /usr/local/bin/frm             快速入口
 /usr/local/bin/frm-node        完整入口
 ```
@@ -158,4 +202,8 @@ frm adopt rollback [接管编号]
 find . -type f \( -name '*.sh' -o -name 'frm-node' \) -print0 | xargs -0 -n1 bash -n
 shellcheck -x frm-node install.sh bootstrap.sh lib/*.sh protocols/*.sh tests/*.sh
 bash tests/smoke.sh
+bash tests/adopt-smoke.sh
+bash tests/watch-smoke.sh
+bash tests/sub-smoke.sh
+bash tests/sub-collect-smoke.sh
 ```

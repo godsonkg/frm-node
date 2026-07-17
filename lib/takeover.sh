@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 
 takeover_latest_link() { printf '%s/latest\n' "$FRM_TAKEOVER_DIR"; }
+takeover_latest_file() { printf '%s/latest.path\n' "$FRM_TAKEOVER_DIR"; }
 
 takeover_latest_dir() {
-  local link
+  local link pointer dir
   link=$(takeover_latest_link)
-  [[ -L $link ]] || return 1
-  readlink -f "$link"
+  if [[ -L $link ]]; then
+    readlink -f "$link"
+    return
+  fi
+  pointer=$(takeover_latest_file)
+  [[ -r $pointer ]] || return 1
+  IFS= read -r dir <"$pointer"
+  [[ -d $dir ]] || return 1
+  printf '%s\n' "$dir"
 }
 
 takeover_add_path() {
@@ -225,7 +233,9 @@ adopt_takeover() {
     die "接管后健康检查失败，已自动回滚控制面。"
   fi
   latest=$(takeover_latest_link)
-  ln -sfn "$dir" "$latest"
+  printf '%s\n' "$dir" >"$(takeover_latest_file)"
+  chmod 0600 "$(takeover_latest_file)"
+  ln -sfn "$dir" "$latest" 2>/dev/null || true
   log_action "takeover activated $takeover_id"
   ok "完整控制面接管成功；数据服务未重启。"
   printf '回滚命令：frm adopt rollback %s\n' "$takeover_id"

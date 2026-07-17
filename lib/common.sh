@@ -7,6 +7,7 @@ FRM_INSTANCE_DIR=${FRM_INSTANCE_DIR:-$FRM_ETC/instances}
 FRM_REGISTRY_DIR=${FRM_REGISTRY_DIR:-$FRM_STATE/instances}
 FRM_BACKUP_DIR=${FRM_BACKUP_DIR:-$FRM_STATE/backups}
 FRM_TAKEOVER_DIR=${FRM_TAKEOVER_DIR:-$FRM_STATE/takeovers}
+FRM_SUB_DIR=${FRM_SUB_DIR:-$FRM_STATE/sub}
 FRM_SYSTEMD_DIR=${FRM_SYSTEMD_DIR:-/etc/systemd/system}
 FRM_LOG=${FRM_LOG:-/var/log/frm-node.log}
 
@@ -33,6 +34,8 @@ init_layout() {
   install -d -m 0755 "$FRM_ETC" "$FRM_STATE" "$FRM_BIN_DIR" "$FRM_REGISTRY_DIR" "$FRM_BACKUP_DIR"
   install -d "$FRM_TAKEOVER_DIR"
   chmod 0700 "$FRM_TAKEOVER_DIR"
+  install -d "$FRM_SUB_DIR"
+  chmod 0700 "$FRM_SUB_DIR"
   install -d "$FRM_INSTANCE_DIR"
   chmod 0700 "$FRM_INSTANCE_DIR"
   touch "$FRM_LOG"

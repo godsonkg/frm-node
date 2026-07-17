@@ -24,3 +24,7 @@ jobs:
         run: bash tests/adopt-smoke.sh
       - name: Watch monitoring test
         run: bash tests/watch-smoke.sh
+      - name: Subscription fragment test
+        run: bash tests/sub-smoke.sh
+      - name: Subscription collector test
+        run: bash tests/sub-collect-smoke.sh
