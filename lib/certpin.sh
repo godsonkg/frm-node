@@ -41,10 +41,51 @@ certpin_current_pin() {
   certpin_credential_field "$1" FINGERPRINT
 }
 
-# 优先用原生证书路径，其次扫描注册表记录的配置，最后扫描同目录的兄弟配置
-# （接管实例的注册表配置多为来源脚本的汇总文件，证书路径常在同目录另一个文件里）。
+# 目录里出现多张候选证书时，把候选清单留在这里供调用方展示。
+CERTPIN_CANDIDATES=''
+
+# sing-box 用 certificate_path，xray 用 certificateFile。同一目录常同时承载
+# 两个核心（如 vless-all-in-one 的 /etc/vless-reality），按实例所属服务挑选
+# 对应键名，避免把另一个核心的证书张冠李戴地钉到本实例上。
+certpin_preferred_cert_key() {
+  local id=$1 services
+  services=$(instance_services "$id" 2>/dev/null | tr '\n' ' ')
+  case $services in
+    *sing-box*|*singbox*) printf 'certificate_path' ;;
+    *xray*) printf 'certificateFile' ;;
+    *) printf '' ;;
+  esac
+}
+
+# key 为空时匹配所有已知键名；否则只匹配指定键名。
+certpin_scan_config_for_key() {
+  local file=$1 key=${2:-} path=''
+  [[ -r $file ]] || return 0
+  if [[ -n $key ]]; then
+    path=$(sed -nE "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\1/p" "$file" 2>/dev/null | head -n 1)
+  else
+    path=$(sed -nE 's/.*"(certificate_path|certificateFile|cert_file)"[[:space:]]*:[[:space:]]*"([^"]+)".*/\2/p' "$file" 2>/dev/null | head -n 1)
+    [[ -n $path ]] || path=$(sed -nE 's/^[[:space:]]*cert:[[:space:]]*"?([^"]+)"?[[:space:]]*$/\1/p' "$file" 2>/dev/null | head -n 1)
+  fi
+  printf '%s' "$path"
+}
+
+# 列出目录下互不相同的候选证书路径。
+certpin_candidate_certs() {
+  local dir=$1 key=${2:-} file path
+  [[ -d $dir ]] || return 0
+  shopt -s nullglob
+  for file in "$dir"/*.json "$dir"/*.yaml "$dir"/*.yml; do
+    path=$(certpin_scan_config_for_key "$file" "$key")
+    [[ -n $path && -r $path ]] && printf '%s\n' "$path"
+  done
+  shopt -u nullglob
+}
+
+# 返回 0 并打印路径；找不到返回 1；候选多于一张无法确定时返回 2。
 certpin_find_cert_file() {
-  local id=$1 native config dir path
+  local id=$1 native config dir key path candidates count
+  CERTPIN_CANDIDATES=''
   native="$FRM_INSTANCE_DIR/$id.crt"
   if [[ -r $native ]]; then
     printf '%s\n' "$native"
@@ -52,38 +93,31 @@ certpin_find_cert_file() {
   fi
   config=$(registry_get "$id" '.config_file' 2>/dev/null || true)
   [[ -n $config && $config != null ]] || return 1
-  path=$(certpin_scan_config_for_cert "$config")
-  if [[ -z $path && -n $config ]]; then
-    dir=$(dirname "$config")
-    path=$(certpin_scan_dir_for_cert "$dir")
+
+  # 实例自己的配置里直接写了证书路径时最可靠。
+  path=$(certpin_scan_config_for_key "$config" '')
+  if [[ -n $path && -r $path ]]; then
+    printf '%s\n' "$path"
+    return 0
   fi
-  [[ -n $path && -r $path ]] || return 1
-  printf '%s\n' "$path"
-}
 
-# 兼容 sing-box(certificate_path)、xray(certificateFile) 与 hysteria(cert:) 的键名。
-certpin_scan_config_for_cert() {
-  local file=$1 path=''
-  [[ -r $file ]] || return 0
-  path=$(sed -nE 's/.*"(certificate_path|certificateFile|cert_file)"[[:space:]]*:[[:space:]]*"([^"]+)".*/\2/p' "$file" 2>/dev/null | head -n 1)
-  [[ -n $path ]] || path=$(sed -nE 's/^[[:space:]]*cert:[[:space:]]*"?([^"]+)"?[[:space:]]*$/\1/p' "$file" 2>/dev/null | head -n 1)
-  printf '%s' "$path"
-}
+  # 否则扫描同目录：先按本实例核心对应的键名收敛。
+  dir=$(dirname "$config")
+  key=$(certpin_preferred_cert_key "$id")
+  candidates=$(certpin_candidate_certs "$dir" "$key" | sort -u)
+  [[ -n $candidates ]] || candidates=$(certpin_candidate_certs "$dir" '' | sort -u)
+  count=$(grep -c . <<<"$candidates" || true)
 
-certpin_scan_dir_for_cert() {
-  local dir=$1 file path
-  [[ -d $dir ]] || return 0
-  shopt -s nullglob
-  for file in "$dir"/*.json "$dir"/*.yaml "$dir"/*.yml; do
-    path=$(certpin_scan_config_for_cert "$file")
-    if [[ -n $path && -r $path ]]; then
-      shopt -u nullglob
-      printf '%s' "$path"
-      return 0
-    fi
-  done
-  shopt -u nullglob
-  return 0
+  if (( count == 1 )); then
+    printf '%s\n' "$candidates"
+    return 0
+  fi
+  if (( count > 1 )); then
+    # 宁可拒绝，也不能钉错证书——钉错会让客户端因指纹不匹配而完全连不上。
+    CERTPIN_CANDIDATES=$candidates
+    return 2
+  fi
+  return 1
 }
 
 # 取证书 PEM 落到 $3；成功时在 stdout 打印来源说明。
@@ -116,10 +150,18 @@ certpin_fetch_pem() {
   fi
 
   # QUIC/UDP 无法用 s_client 探测，退回定位证书文件。
-  cert=$(certpin_find_cert_file "$id") || {
+  local rc=0
+  cert=$(certpin_find_cert_file "$id") || rc=$?
+  if (( rc == 2 )); then
+    warn "$id 所在目录存在多张候选证书，无法确定属于本实例，已中止以免钉错："
+    printf '%s\n' "$CERTPIN_CANDIDATES" | sed 's/^/           /' >&2
+    warn "请核对后用 frm cert pin $id --cert <路径> 指定。"
+    return 1
+  fi
+  if (( rc != 0 )) || [[ -z $cert ]]; then
     warn "无法自动定位 $id 的证书；确认路径后用 frm cert pin $id --cert <路径> 指定。"
     return 1
-  }
+  fi
   openssl x509 -in "$cert" -outform pem >"$out" 2>/dev/null || {
     warn "无法解析证书文件：$cert"
     return 1

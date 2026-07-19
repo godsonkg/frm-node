@@ -122,6 +122,43 @@ certpin_store tj-1 ''
 out=$(render_trojan_mihomo tj-1 TEST-TROJAN)
 if grep -q 'fingerprint' <<<"$out"; then exit 1; fi
 
+# ---------- 多核共存目录：必须按核心区分，绝不能取错证书 ----------
+# 复现真实场景：/etc/vless-reality 同时承载 xray(certificateFile) 与
+# sing-box(certificate_path)，两者证书不同；取错会导致客户端指纹不匹配连不上。
+MIXED="$TMP/mixed"
+mkdir -p "$MIXED"
+XRAY_CRT="$MIXED/xray.crt"; SBOX_CRT="$MIXED/singbox.crt"
+openssl req -x509 -nodes -newkey rsa:2048 -sha256 -days 3650 \
+  -keyout "$TMP/x.key" -out "$XRAY_CRT" -subj "/CN=xray.example.com" >/dev/null 2>&1
+openssl req -x509 -nodes -newkey rsa:2048 -sha256 -days 3650 \
+  -keyout "$TMP/s.key" -out "$SBOX_CRT" -subj "/CN=singbox.example.com" >/dev/null 2>&1
+XRAY_FP=$(openssl x509 -in "$XRAY_CRT" -noout -fingerprint -sha256 | cut -d= -f2)
+SBOX_FP=$(openssl x509 -in "$SBOX_CRT" -noout -fingerprint -sha256 | cut -d= -f2)
+[[ $XRAY_FP != "$SBOX_FP" ]]
+
+# config.json 按字母序排在 singbox.json 之前，天真实现会取错。
+printf '{"certificateFile":"%s"}\n' "$XRAY_CRT" >"$MIXED/config.json"
+printf '{"certificate_path":"%s"}\n' "$SBOX_CRT" >"$MIXED/singbox.json"
+printf '{"note":"aggregate"}\n' >"$MIXED/db.json"
+
+# sing-box 承载的 Hy2：必须拿到 sing-box 那张，而不是排在前面的 xray 那张。
+write_credentials mix-hy2 SERVER_IPV4 192.0.2.20 PORT 58800 PASSWORD pw SNI e.com OBFS_PASSWORD ""
+registry_write mix-hy2 hysteria2 Hysteria2 58800 udp test "$(credential_path mix-hy2)" "$MIXED/db.json" sing-box.service
+certpin_pin_instance mix-hy2 >/dev/null
+[[ $(certpin_current_pin mix-hy2) == "$SBOX_FP" ]]
+[[ $(certpin_current_pin mix-hy2) != "$XRAY_FP" ]]
+
+# 无法判断核心时（服务名不含 xray/sing-box），存在多张候选就必须拒绝而非乱猜。
+write_credentials mix-unknown SERVER_IPV4 192.0.2.21 PORT 58801 PASSWORD pw SNI e.com OBFS_PASSWORD ""
+registry_write mix-unknown hysteria2 Hysteria2 58801 udp test "$(credential_path mix-unknown)" "$MIXED/db.json" other.service
+if certpin_pin_instance mix-unknown >"$TMP/mixed.out" 2>&1; then exit 1; fi
+[[ -z $(certpin_current_pin mix-unknown) ]]
+grep -q '多张候选证书' "$TMP/mixed.out"
+
+# 拒绝之后，用 --cert 显式指定必须能成功。
+certpin_pin_instance mix-unknown "$SBOX_CRT" >/dev/null
+[[ $(certpin_current_pin mix-unknown) == "$SBOX_FP" ]]
+
 # ---------- scan 只读，不得写入任何指纹 ----------
 before=$(cat "$(credential_path hy2-short)")
 certpin_scan_command >/dev/null
