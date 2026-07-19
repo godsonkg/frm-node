@@ -26,5 +26,7 @@ jobs:
         run: bash tests/watch-smoke.sh
       - name: Subscription fragment test
         run: bash tests/sub-smoke.sh
+      - name: Certificate pinning test
+        run: bash tests/certpin-smoke.sh
       - name: Subscription collector test
         run: bash tests/sub-collect-smoke.sh

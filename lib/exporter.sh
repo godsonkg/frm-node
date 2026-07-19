@@ -3,6 +3,12 @@
 # 纯渲染函数只输出一个节点定义，不带标题、横幅或说明。
 # 人类可读的 frm show 与机器可读的 frm sub fragment 共用这些函数。
 
+# Mihomo 的 fingerprint 字段用无冒号小写十六进制；
+# Hysteria2 URI 的 pinSHA256 沿用 openssl 的冒号大写形式。
+fingerprint_hex() {
+  printf '%s' "$1" | tr -d ':' | tr '[:upper:]' '[:lower:]'
+}
+
 render_anytls_mihomo() {
   local id=$1 name=$2
   load_credentials "$id"
@@ -38,7 +44,7 @@ render_hysteria2_mihomo() {
   local id=$1 name=$2 pin_yaml='' obfs_yaml=''
   local OBFS_PASSWORD='' FINGERPRINT=''
   load_credentials "$id"
-  [[ -z ${FINGERPRINT:-} ]] || pin_yaml=$'\n  fingerprint: "'$FINGERPRINT'"'
+  [[ -z ${FINGERPRINT:-} ]] || pin_yaml=$'\n  fingerprint: "'$(fingerprint_hex "$FINGERPRINT")'"'
   if [[ -n ${OBFS_PASSWORD:-} ]]; then
     obfs_yaml=$'\n  obfs: salamander\n  obfs-password: "'$OBFS_PASSWORD'"'
   fi
@@ -155,8 +161,11 @@ render_tuic_uri() {
 }
 
 render_trojan_mihomo() {
-  local id=$1 name=$2
+  local id=$1 name=$2 pin_yaml=''
+  local FINGERPRINT=''
   load_credentials "$id"
+  # 纯 IP 节点没有受信证书，但自签证书长期固定，可用指纹替代 CA 验证。
+  [[ -z ${FINGERPRINT:-} ]] || pin_yaml=$'\n  fingerprint: "'$(fingerprint_hex "$FINGERPRINT")'"'
   cat <<EOF
 - name: "$name"
   type: trojan
@@ -165,7 +174,7 @@ render_trojan_mihomo() {
   password: "$PASSWORD"
   sni: $SNI
   udp: true
-  skip-cert-verify: true
+  skip-cert-verify: true$pin_yaml
 EOF
 }
 

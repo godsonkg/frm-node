@@ -39,11 +39,13 @@ grep -q 'type: anytls' <<<"$output"
 grep -q '192.0.2.10' <<<"$output"
 
 # Hysteria2 导出必须带证书指纹钉扎（凭据缺失时静默降级）。
+# 两种格式刻意不同：Mihomo 的 fingerprint 用无冒号小写十六进制，
+# Hysteria2 URI 的 pinSHA256 沿用 openssl 的冒号大写形式。
 write_credentials test-hy2 SERVER_IPV4 192.0.2.10 PORT 8443 PASSWORD hy-pass SNI example.com \
   OBFS_PASSWORD "" FINGERPRINT "AA:BB:CC:DD"
 registry_write test-hy2 hysteria2 Hysteria2 8443 udp test "$(credential_path test-hy2)" "" frm-test-hy2.service
 output=$(export_instance test-hy2)
-grep -q 'fingerprint: "AA:BB:CC:DD"' <<<"$output"
+grep -q 'fingerprint: "aabbccdd"' <<<"$output"
 grep -q 'pinSHA256=AA:BB:CC:DD' <<<"$output"
 
 # 无 FINGERPRINT 的旧实例导出不得携带钉扎字段，也不得沿用上一实例的残留值。
@@ -51,7 +53,8 @@ write_credentials test-hy2-old SERVER_IPV4 192.0.2.11 PORT 8444 PASSWORD hy-old 
 registry_write test-hy2-old hysteria2 Hysteria2 8444 udp test "$(credential_path test-hy2-old)" "" frm-test-hy2b.service
 output=$(export_instance test-hy2-old)
 if grep -q 'pinSHA256' <<<"$output"; then exit 1; fi
-if grep -q 'AA:BB:CC:DD' <<<"$output"; then exit 1; fi
+if grep -q 'fingerprint' <<<"$output"; then exit 1; fi
+if grep -qi 'aabbccdd' <<<"$output"; then exit 1; fi
 
 # Snell v6 必须显式拒绝 ShadowTLS 部署模式。
 grep -q 'major == 6 &&.*mode == shadowtls' "$ROOT/protocols/snell.sh"

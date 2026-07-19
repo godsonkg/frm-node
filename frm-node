@@ -18,6 +18,7 @@ source "$FRM_HOME/lib/maintenance.sh"
 source "$FRM_HOME/lib/adopt.sh"
 source "$FRM_HOME/lib/takeover.sh"
 source "$FRM_HOME/lib/watch.sh"
+source "$FRM_HOME/lib/certpin.sh"
 source "$FRM_HOME/lib/subscription.sh"
 source "$FRM_HOME/protocols/anytls.sh"
 source "$FRM_HOME/protocols/hysteria2.sh"
@@ -57,6 +58,9 @@ frm-node 中文节点管理器
                               经 SSH 输出指定格式片段
   frm sub check [--prefix 名称] 自动生成并脱敏检查权限、结构和协议跳过
   frm sub status              查看本机片段文件状态
+  frm cert scan               查看各实例证书指纹钉扎状态
+  frm cert pin [实例|all]      补录证书指纹（临时证书会被拒绝）
+  frm cert unpin 实例          移除指纹钉扎
   frm version                 查看版本
 
 协议名称：reality、anytls、hysteria2、snell4、snell4-shadowtls、
@@ -200,5 +204,6 @@ case $command in
   adopt) adopt_command "${2:-scan}" "${3:-}" ;;
   watch) watch_command "${2:-status}" ;;
   sub) sub_command "${2:-status}" "${@:3}" ;;
+  cert) certpin_command "${2:-scan}" "${3:-}" "${@:4}" ;;
   *) usage; die "未知命令：$command" ;;
 esac
