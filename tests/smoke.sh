@@ -73,4 +73,18 @@ grep -q 'registry_table >&2' "$ROOT/frm-node"
 # Snell 下载校验钉扎机制必须保留。
 grep -q 'verify_pinned_sha256' "$ROOT/protocols/base.sh"
 
+# 已钉扎的 amd64 校验值必须存在且为 64 位十六进制；
+# 升级 SNELL*_VERSION 却忘记同步校验值时，这里会失败。
+for major in 4 5 6; do
+  var="SNELL${major}_SHA256_AMD64"
+  value=${!var:-}
+  [[ $value =~ ^[0-9a-f]{64}$ ]] || {
+    echo "versions.env 中 $var 缺失或不是 64 位十六进制；升级 Snell 版本后必须同步更新校验值。" >&2
+    exit 1
+  }
+done
+
+# 校验失败必须中止安装，不能降级为警告后继续。
+grep -q '不匹配，已停止安装' "$ROOT/protocols/base.sh"
+
 echo "smoke tests passed"
