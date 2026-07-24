@@ -9,6 +9,18 @@ fingerprint_hex() {
   printf '%s' "$1" | tr -d ':' | tr '[:upper:]' '[:lower:]'
 }
 
+render_surge_tls_verification() {
+  local fingerprint=${1:-} normalized
+  if [[ -z $fingerprint ]]; then
+    printf '%s' 'skip-cert-verify=true'
+    return 0
+  fi
+
+  normalized=$(fingerprint_hex "$fingerprint")
+  [[ $normalized =~ ^[0-9a-f]{64}$ ]] || return 2
+  printf 'server-cert-fingerprint-sha256=%s' "$normalized"
+}
+
 render_anytls_mihomo() {
   local id=$1 name=$2
   load_credentials "$id"
@@ -60,12 +72,13 @@ EOF
 }
 
 render_hysteria2_surge() {
-  local id=$1 name=$2 obfs_surge=''
-  local OBFS_PASSWORD=''
+  local id=$1 name=$2 obfs_surge='' tls_verification
+  local OBFS_PASSWORD='' FINGERPRINT=''
   load_credentials "$id"
+  tls_verification=$(render_surge_tls_verification "${FINGERPRINT:-}") || return 2
   [[ -z ${OBFS_PASSWORD:-} ]] || obfs_surge=", salamander-password=$OBFS_PASSWORD"
-  printf '%s = hysteria2, %s, %s, password=%s, ip-version=v4-only, ecn=true, skip-cert-verify=true, sni=%s%s\n' \
-    "$name" "$SERVER_IPV4" "$PORT" "$PASSWORD" "$SNI" "$obfs_surge"
+  printf '%s = hysteria2, %s, %s, password=%s, ip-version=v4-only, ecn=true, %s, sni=%s%s\n' \
+    "$name" "$SERVER_IPV4" "$PORT" "$PASSWORD" "$tls_verification" "$SNI" "$obfs_surge"
 }
 
 render_hysteria2_loon() {
@@ -179,10 +192,12 @@ EOF
 }
 
 render_trojan_surge() {
-  local id=$1 name=$2
+  local id=$1 name=$2 tls_verification
+  local FINGERPRINT=''
   load_credentials "$id"
-  printf '%s = trojan, %s, %s, password=%s, sni=%s, skip-cert-verify=true, ip-version=v4-only\n' \
-    "$name" "$SERVER_IPV4" "$PORT" "$PASSWORD" "$SNI"
+  tls_verification=$(render_surge_tls_verification "${FINGERPRINT:-}") || return 2
+  printf '%s = trojan, %s, %s, password=%s, sni=%s, %s, ip-version=v4-only\n' \
+    "$name" "$SERVER_IPV4" "$PORT" "$PASSWORD" "$SNI" "$tls_verification"
 }
 
 render_trojan_loon() {

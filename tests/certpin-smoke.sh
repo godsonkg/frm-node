@@ -99,9 +99,21 @@ rendered_value=$(sed -nE 's/.*fingerprint: "([^"]+)".*/\1/p' <<<"$out")
 [[ $rendered_value != *:* ]]
 [[ $rendered_value =~ ^[0-9a-f]{64}$ ]]
 
+# Surge：已钉扎的 Hy2 必须改用 64 位小写指纹，不再同时跳过证书校验。
+out=$(render_hysteria2_surge hy2-long TEST-HY2)
+grep -q "server-cert-fingerprint-sha256=$expected_hex" <<<"$out"
+if grep -q 'skip-cert-verify=true' <<<"$out"; then exit 1; fi
+surge_pin=$(sed -nE 's/.*server-cert-fingerprint-sha256=([0-9a-f]+).*/\1/p' <<<"$out")
+[[ $surge_pin =~ ^[0-9a-f]{64}$ ]]
+
 # 未钉扎的实例导出中不得出现 fingerprint 字段，也不得串用上一实例的值。
 out=$(render_hysteria2_mihomo hy2-short TEST-HY2B)
 if grep -q 'fingerprint' <<<"$out"; then exit 1; fi
+
+# Surge：未钉扎 Hy2 保留原有跳过校验，且不能串用前一个实例的指纹。
+out=$(render_hysteria2_surge hy2-short TEST-HY2B)
+grep -q 'skip-cert-verify=true' <<<"$out"
+if grep -q 'server-cert-fingerprint-sha256' <<<"$out"; then exit 1; fi
 
 # Trojan 钉扎后同样带 fingerprint。
 write_credentials tj-1 SERVER_IPV4 192.0.2.14 PORT 2096 PASSWORD tjpw SNI t.example.com
@@ -110,11 +122,34 @@ certpin_store tj-1 "$LONG_FP"
 out=$(render_trojan_mihomo tj-1 TEST-TROJAN)
 grep -q "fingerprint: \"$expected_hex\"" <<<"$out"
 
+# Surge：已钉扎 Trojan 使用同一规范化指纹，不再同时跳过证书校验。
+out=$(render_trojan_surge tj-1 TEST-TROJAN)
+grep -q "server-cert-fingerprint-sha256=$expected_hex" <<<"$out"
+if grep -q 'skip-cert-verify=true' <<<"$out"; then exit 1; fi
+
 # 未钉扎的 Trojan 不带该字段。
 write_credentials tj-2 SERVER_IPV4 192.0.2.15 PORT 2097 PASSWORD tjpw2 SNI t2.example.com
 registry_write tj-2 trojan Trojan 2097 tcp test "$(credential_path tj-2)" "" frm-f.service
 out=$(render_trojan_mihomo tj-2 TEST-TROJAN2)
 if grep -q 'fingerprint' <<<"$out"; then exit 1; fi
+
+# Surge：未钉扎 Trojan 保留跳过校验，且不得泄漏其他实例的指纹。
+out=$(render_trojan_surge tj-2 TEST-TROJAN2)
+grep -q 'skip-cert-verify=true' <<<"$out"
+if grep -q 'server-cert-fingerprint-sha256' <<<"$out"; then exit 1; fi
+
+# AnyTLS 永远保持临时证书兼容路径，不得输出固定指纹。
+certpin_store any-1 "$LONG_FP"
+out=$(render_anytls_surge any-1 TEST-ANYTLS)
+grep -q 'skip-cert-verify=true' <<<"$out"
+if grep -q 'server-cert-fingerprint-sha256' <<<"$out"; then exit 1; fi
+certpin_store any-1 ''
+
+# 损坏的固定指纹必须安全失败，不能降级成跳过证书校验。
+write_credentials hy2-invalid SERVER_IPV4 192.0.2.16 PORT 8445 PASSWORD pw SNI e.com OBFS_PASSWORD "" FINGERPRINT invalid
+registry_write hy2-invalid hysteria2 Hysteria2 8445 udp test "$(credential_path hy2-invalid)" "" frm-g.service
+if render_hysteria2_surge hy2-invalid TEST-INVALID >"$TMP/invalid.out"; then exit 1; fi
+[[ ! -s $TMP/invalid.out ]]
 
 # ---------- unpin ----------
 certpin_store tj-1 ''
