@@ -24,9 +24,9 @@ TUIC v5、Shadowsocks 2022、NaiveProxy 和证书型 VLESS/Trojan 计划放入�
 - `amd64` 或 `arm64`；Snell 额外支持官方提供的部分旧架构
 - 公网 IPv4；云厂商安全组需要同步放行节点端口
 
-## 一键安装
+## 安装
 
-**推荐做法：固定到某个 tag 安装**，不要长期跟随 `main`。跟随 `main` 意味着每次安装拿到的都是当时的最新提交，仓库一旦被篡改会直接以 root 执行到你的机器上：
+安装需要 root。建议固定 tag 或完整 commit SHA，并先检查下载的脚本；跟随 `main` 会安装当时的最新提交：
 
 ```bash
 FRM_REF=v0.2.1 bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.1/bootstrap.sh)
@@ -35,8 +35,10 @@ FRM_REF=v0.2.1 bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-
 安装器会打印安装包的 SHA-256。记下首次可信安装的值，之后可加 `FRM_SHA256` 强制校验，内容不符即中止：
 
 ```bash
-FRM_REF=v0.2.1 FRM_SHA256=<上次记下的校验值> bash <(curl -fsSL .../bootstrap.sh)
+FRM_REF=v0.2.1 FRM_SHA256="填入可信的安装包 SHA-256" bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.1/bootstrap.sh)
 ```
+
+上例的 `FRM_SHA256` 需要替换为实际校验值；它校验的是安装包，不是 `bootstrap.sh`。
 
 `FRM_REF` 也接受分支名或完整 commit SHA。跟随最新开发版（仅在你清楚改动内容时使用）：
 
@@ -99,7 +101,7 @@ frm sub status             # 查看片段文件状态
 
 ## 旧节点兼容接管
 
-当前可识别 `mack-a/v2ray-agent`、`chil30-group/vless-all-in-one`，以及常见官方 Snell 独立安装。`adopt register` 会保留原 IP、端口、凭据、核心、systemd 单元、证书和定时任务，只把节点登记到 frm-node，属于零中断的兼容接管。
+当前可识别 `mack-a/v2ray-agent`、`chil30-group/vless-all-in-one`，以及常见官方 Snell 独立安装。`adopt register` 会保留原 IP、端口、凭据、核心、systemd 单元、证书和定时任务，只把节点登记到 frm-node，登记过程不重启原服务。
 
 兼容接管实例可以统一查看、导出、诊断、启停和读取日志。为保护共用的 Xray/sing-box 核心，它们暂时不能由 `frm update` 覆盖，也不能通过普通 `uninstall` 删除。可使用 `frm adopt forget <实例>` 安全撤销登记。
 
@@ -123,21 +125,21 @@ frm adopt rollback [接管编号]
 
 ## 推送监控（frm watch）
 
-`frm watch` 是零暴露面的 Telegram 推送监控：无监听端口、无常驻进程、无 Web 面板，由 systemd timer 周期拉起一次巡检后立即退出（默认 5 分钟一轮）。
+`frm watch` 通过 Telegram 推送巡检结果：无监听端口、无常驻进程、无 Web 面板，由 systemd timer 周期拉起一次巡检后立即退出（默认 5 分钟一轮）。
 
 监控内容：
 
-- 实例服务与端口健康，异常即时告警、恢复自动通知（同一问题 6 小时内不重复推送）
+- 实例服务与端口健康，巡检发现异常时告警、恢复时通知（同一问题 6 小时内不重复推送）
 - 磁盘占用（85% 提醒 / 95% 严重）
 - 月流量用量（需安装 vnstat 并在配置中填写配额，80%/95% 各提醒一次）
 - 每次 SSH 登录成功即推送来源 IP（可配置已知 IP 白名单减噪）
-- 基线外新增监听端口告警（疑似后门植入）。为避免误报：已知代理核心（xray、sing-box、anytls-server、snell-server、hysteria 等，可用 `WATCH_UDP_RELAY_PROCS` 覆盖）中转 UDP/QUIC 流量的临时端口不计入监听面；其余新端口需连续两轮巡检都出现才告警，真正驻留的后门最多晚一个巡检周期被发现
-- root crontab 内容变化告警（疑似持久化后门）
+- 基线外新增监听端口告警。为避免误报：已知代理核心（xray、sing-box、anytls-server、snell-server、hysteria 等，可用 `WATCH_UDP_RELAY_PROCS` 覆盖）中转 UDP/QUIC 流量的临时端口不计入监听面；其余新端口需连续两轮巡检都出现才告警，这项检查只比较监听端口，不替代入侵检测
+- root crontab 内容变化告警
 - 每日固定时刻推送巡检日报
 
 安全约束：Bot Token 只保存在 `/etc/frm-node/watch.env`（600）；推送消息永不包含密码、PSK、UUID、私钥或订阅地址，默认不包含端口号。配置走 `frm watch setup` 交互完成，请勿把 Token 粘贴到聊天或截图。
 
-## 私有订阅 Phase 1（零新增暴露面）
+## 通过 SSH 汇总私有订阅
 
 每台 VPS 可生成 Surge、Loon、Mihomo 三种干净节点片段。片段不含 `frm show` 的分节标题、提示横幅和说明文字：
 
@@ -181,7 +183,7 @@ Phase 1 只复用现有 SSH，不增加监听端口。所有产物都含完整�
 
 ## 证书指纹钉扎（frm cert）
 
-纯 IP 节点签不了受信证书，客户端只能 `skip-cert-verify`。对使用**长期固定自签证书**的协议，可以补录证书 SHA-256 指纹，让客户端在不做 CA 链验证的前提下仍能识别服务端，抵御中间人。
+使用自签证书的节点通常需要跳过 CA 链验证。对使用长期固定自签证书的协议，可以补录证书 SHA-256 指纹，让支持钉扎的客户端核对服务端证书。
 
 ```bash
 frm cert scan            # 只读：列出各实例的钉扎状态与可行性
@@ -202,7 +204,7 @@ frm cert unpin <实例>     # 移除钉扎
 | Reality | ❌ | 借用真实站点证书，客户端凭 `public-key` 验证，无需指纹 |
 | Snell | ❌ | 不使用 TLS 证书 |
 
-**内置安全阀**：证书有效期短于 30 天一律拒绝钉扎并说明原因，避免把临时证书钉死导致节点断连。
+钉扎前会检查证书有效期：证书有效期短于 30 天一律拒绝钉扎并说明原因，避免把临时证书钉死导致节点断连。
 
 钉扎结果输出到 Mihomo/Clash 的 `fingerprint` 字段、Hysteria2 的 `pinSHA256` URI 参数，以及 Surge Hysteria2/Trojan 的 `server-cert-fingerprint-sha256` 参数。Surge 仅在存在合法 64 位 SHA-256 指纹时启用钉扎并移除该节点的 `skip-cert-verify=true`；未补录实例保留原有兼容行为，AnyTLS 永不输出固定指纹。Loon 的对应参数尚未确认，暂不输出。补录后需重新生成订阅，并确认客户端能正常解析与连接。
 
@@ -233,12 +235,15 @@ frm cert unpin <实例>     # 移除钉扎
 
 ## 开发检查
 
+需要 Bash、jq 和 ShellCheck。以下命令与仓库 CI 的检查范围一致；在仓库根目录运行，不要运行安装脚本代替测试。
+
 ```bash
 find . -type f \( -name '*.sh' -o -name 'frm-node' \) -print0 | xargs -0 -n1 bash -n
-shellcheck -x frm-node install.sh bootstrap.sh lib/*.sh protocols/*.sh tests/*.sh
+find . -type f \( -name '*.sh' -o -name 'frm-node' \) -print0 | xargs -0 shellcheck -x
 bash tests/smoke.sh
 bash tests/adopt-smoke.sh
 bash tests/watch-smoke.sh
 bash tests/sub-smoke.sh
+bash tests/certpin-smoke.sh
 bash tests/sub-collect-smoke.sh
 ```
