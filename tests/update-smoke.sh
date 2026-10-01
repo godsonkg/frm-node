@@ -93,7 +93,7 @@ MODE=healthy
 RESTART_FAIL=1 assert_fails update_core anytls "$FRM_BIN_DIR/anytls-server" anytls
 grep -q 'echo old' "$FRM_BIN_DIR/anytls-server"
 # Invoked indirectly by update_core.
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 update_download_core() { printf broken >"$FRM_BIN_DIR/anytls-server"; return 1; }
 assert_fails update_core anytls "$FRM_BIN_DIR/anytls-server" anytls
 grep -q 'echo old' "$FRM_BIN_DIR/anytls-server"
