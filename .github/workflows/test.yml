@@ -10,8 +10,11 @@ permissions:
 jobs:
   shell:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Install test tools
         run: sudo apt-get update && sudo apt-get install -y jq shellcheck
       - name: Bash syntax
@@ -30,3 +33,5 @@ jobs:
         run: bash tests/certpin-smoke.sh
       - name: Subscription collector test
         run: bash tests/sub-collect-smoke.sh
+      - name: Update reliability test
+        run: bash tests/update-smoke.sh

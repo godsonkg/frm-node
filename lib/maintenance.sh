@@ -42,46 +42,46 @@ restore_backup() {
 update_core() {
   local core=$1 binary=$2 protocol_filter=$3 backup id failed=0
   [[ -x $binary ]] || { warn "$core 尚未安装，跳过。"; return 0; }
-  backup="$binary.bak.$(date +%s)"
-  cp -a "$binary" "$backup"
-  export FRM_FORCE_DOWNLOAD=1
-  case $core in
-    anytls) ensure_anytls_binary ;;
-    hysteria2) ensure_hysteria_binary ;;
-    xray) ensure_xray_binary ;;
-    snell4) ensure_snell_binary 4 ;;
-    snell5) ensure_snell_binary 5 ;;
-    snell6) ensure_snell_binary 6 ;;
-  esac
-  unset FRM_FORCE_DOWNLOAD
+  backup=$(mktemp "$binary.bak.XXXXXX") || return 1
+  cp -a "$binary" "$backup" || { rm -f "$backup"; return 1; }
+  # A separate Bash process enforces errexit even when update is invoked by
+  # a conditional menu command; failed downloads must not fall through.
+  if ! update_download_core "$core"; then
+    mv -f "$backup" "$binary" || { warn "$core 无法恢复旧核心，备份保留：$backup"; return 1; }
+    warn "$core 下载或安装失败，已恢复旧核心。"
+    return 1
+  fi
   while IFS= read -r id; do
     registry_is_external "$id" && continue
-    instance_service_action "$id" restart || failed=1
+    update_restart_instance "$id" || failed=1
+    update_health_instance "$id" || failed=1
   done < <(jq -r --arg p "$protocol_filter" 'select(.protocol == $p and (.ownership // "frm") == "frm") | .id' "$FRM_REGISTRY_DIR"/*.json 2>/dev/null || true)
   if (( failed )); then
     warn "$core 更新后服务异常，正在回滚。"
-    mv -f "$backup" "$binary"
+    mv -f "$backup" "$binary" || { warn "$core 无法恢复旧核心，备份保留：$backup"; return 1; }
     while IFS= read -r id; do
       registry_is_external "$id" && continue
-      instance_service_action "$id" restart || true
+      update_restart_instance "$id" || warn "$id 回滚重启失败，请人工检查。"
+      update_health_instance "$id" || warn "$id 回滚后仍异常，请执行 frm doctor 人工检查。"
     done < <(jq -r --arg p "$protocol_filter" 'select(.protocol == $p and (.ownership // "frm") == "frm") | .id' "$FRM_REGISTRY_DIR"/*.json 2>/dev/null || true)
     return 1
   fi
   rm -f "$backup"
-  ok "$core 核心更新完成。"
+  ok "$core 核心更新完成；短观察窗服务与监听检查通过（非客户端端到端验证）。"
 }
 
 update_installed_cores() {
+  update_preflight || { warn "预检失败，停止更新。"; return 1; }
   backup_all
-  update_core anytls "$FRM_BIN_DIR/anytls-server" anytls
-  update_core hysteria2 "$FRM_BIN_DIR/hysteria" hysteria2
-  update_core xray "$FRM_BIN_DIR/xray" reality
-  update_core snell4 "$FRM_BIN_DIR/snell-server-v4" snell4
-  update_core snell5 "$FRM_BIN_DIR/snell-server-v5" snell5
+  update_core anytls "$FRM_BIN_DIR/anytls-server" anytls || return 1
+  update_core hysteria2 "$FRM_BIN_DIR/hysteria" hysteria2 || return 1
+  update_core xray "$FRM_BIN_DIR/xray" reality || return 1
+  update_core snell4 "$FRM_BIN_DIR/snell-server-v4" snell4 || return 1
+  update_core snell5 "$FRM_BIN_DIR/snell-server-v5" snell5 || return 1
   if [[ -x $FRM_BIN_DIR/snell-server-v6 ]]; then
     warn "Snell v6 是测试版，将按 versions.env 中锁定的版本更新。"
   fi
-  update_core snell6 "$FRM_BIN_DIR/snell-server-v6" snell6
+  update_core snell6 "$FRM_BIN_DIR/snell-server-v6" snell6 || return 1
   doctor_all
 }
 

@@ -15,6 +15,7 @@ source "$FRM_HOME/protocols/base.sh"
 source "$FRM_HOME/lib/exporter.sh"
 source "$FRM_HOME/lib/diagnostic.sh"
 source "$FRM_HOME/lib/maintenance.sh"
+source "$FRM_HOME/lib/update_checks.sh"
 source "$FRM_HOME/lib/adopt.sh"
 source "$FRM_HOME/lib/takeover.sh"
 source "$FRM_HOME/lib/watch.sh"
@@ -38,7 +39,9 @@ frm-node 中文节点管理器
   frm start|stop|restart 实例 管理实例服务
   frm logs 实例 [--follow]    查看日志
   frm doctor                  完整中文诊断
-  frm update                  更新已安装协议核心
+  frm update                  预检后更新已安装协议核心
+  frm update --check          只读查看核心版本与官方发布
+  frm update --dry-run        只读本地预检，不下载或重启
   frm backup                  备份配置与核心
   frm restore [备份文件]      恢复备份
   frm uninstall 实例          删除指定实例
@@ -181,6 +184,17 @@ case $command in
   help|-h|--help) usage; exit 0 ;;
   version|-v|--version) printf 'frm-node %s\n' "$FRM_VERSION"; exit 0 ;;
 esac
+
+# Read-only update commands must run before init_layout (which writes files).
+if [[ $command == update && ${2:-} == --check ]]; then
+  check_core_updates
+  exit $?
+elif [[ $command == update && ${2:-} == --dry-run ]]; then
+  update_preflight
+  exit $?
+elif [[ $command == update && $# -gt 1 ]]; then
+  die "未知 update 参数。请使用 --check 或 --dry-run。"
+fi
 
 need_root "$@"
 detect_os

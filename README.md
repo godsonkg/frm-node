@@ -247,3 +247,17 @@ bash tests/sub-smoke.sh
 bash tests/certpin-smoke.sh
 bash tests/sub-collect-smoke.sh
 ```
+
+## 核心更新可靠性检查
+
+- `frm update --check`：只查询已安装核心的版本与 AnyTLS / Hysteria / Xray 官方 GitHub 稳定发布元数据，遇到限流、无效数据或网络错误会明确失败，不下载核心、不启动更新。当前版本无法识别时显示“未知”，版本不同也不自动认定可安全升级
+- Snell 显示本地 `versions.env` 的锁定目标，不能冒充在线最新版；需人工核对官方公告并维护版本及校验值
+- `frm update --dry-run`：只读本地预检，检查命令、架构、登记结构、更新目录权限、核心目录磁盘余量、FRM 原生实例配置/凭据可读及服务/端口稳定性。不会创建目录、写日志、下载核心或重启。读取受限的配置可能需要 sudo
+- `frm update`：先预检，再沿用备份与更新流程。每个原生实例重启后默认观察 3 次、间隔 2 秒，检查服务 active、主 PID/重启计数不变与 TCP/UDP 端口仍在监听。失败恢复旧核心并重启原生实例；回滚后仍异常会明确告警
+- 兼容登记和完整接管实例继续跳过，不能借此更新其共享旧核心。ShadowTLS 不在现有 `frm update` 更新范围内
+
+观察窗只验证本机进程和监听，不能证明客户端认证、TLS、UDP 穿透或外网端到端连接正常。预检不解析每种核心的配置语义，也不保证下载包与现有配置兼容。空间检查是保守余量，不能预知完整配置备份大小。
+
+只读版本检查本身会发起官方 GitHub API 请求，但不发送配置或凭据。未添加定时任务或自动升级。可用 `FRM_UPDATE_HEALTH_SAMPLES`（2–30）、`FRM_UPDATE_HEALTH_INTERVAL`（1–10 秒）调整短观察窗；无效值拒绝检查。
+
+新增回归测试：`bash tests/update-smoke.sh`（使用临时目录、模拟服务/网络，不操作 VPS）。
