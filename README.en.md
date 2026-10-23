@@ -1,5 +1,9 @@
 # frm-node
 
+[![test](https://github.com/godsonkg/frm-node/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/godsonkg/frm-node/actions/workflows/test.yml)
+[![release](https://img.shields.io/github/v/release/godsonkg/frm-node)](https://github.com/godsonkg/frm-node/releases/latest)
+[![license](https://img.shields.io/github/license/godsonkg/frm-node)](LICENSE)
+
 [简体中文](README.md) | **English**
 
 `frm-node` is a multi-protocol proxy node manager for Debian/Ubuntu VPS hosts. It orchestrates the **official** upstream server cores: their configuration, systemd services, diagnostics and client config export. It does not implement any proxy protocol itself.
