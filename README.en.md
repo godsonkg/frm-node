@@ -4,7 +4,7 @@
 
 `frm-node` is a multi-protocol proxy node manager for Debian/Ubuntu VPS hosts. It orchestrates the **official** upstream server cores: their configuration, systemd services, diagnostics and client config export. It does not implement any proxy protocol itself.
 
-Current version: `0.2.1`. Takeover, monitoring and subscription export have been tested on 6 real VPS hosts. It is still a personal tool and has not been fully validated across distributions and CPU architectures. See [SECURITY.md](SECURITY.md) (Chinese) for the security boundary and known trade-offs.
+Current version: `0.2.2`. Takeover, monitoring and subscription export have been tested on 6 real VPS hosts. It is still a personal tool and has not been fully validated across distributions and CPU architectures. See [SECURITY.md](SECURITY.md) (Chinese) for the security boundary and known trade-offs.
 
 > **Note:** the interactive menu, prompts and diagnostic output are in Simplified Chinese. All commands and flags are the English ones listed below.
 
@@ -42,13 +42,13 @@ TUIC v5, Shadowsocks 2022, NaiveProxy and certificate-based VLESS/Trojan are pla
 Installation requires root. Pin a tag or a full commit SHA, and review the downloaded script first. Following `main` installs whatever the latest commit is at that moment.
 
 ```bash
-FRM_REF=v0.2.1 bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.1/bootstrap.sh)
+FRM_REF=v0.2.2 bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.2/bootstrap.sh)
 ```
 
 The installer prints the SHA-256 of the install bundle. Record the value from your first trusted install. After that you can set `FRM_SHA256` to enforce it, and the install aborts on any mismatch:
 
 ```bash
-FRM_REF=v0.2.1 FRM_SHA256="<trusted bundle SHA-256>" bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.1/bootstrap.sh)
+FRM_REF=v0.2.2 FRM_SHA256="<trusted bundle SHA-256>" bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.2/bootstrap.sh)
 ```
 
 `FRM_SHA256` verifies the install bundle, not `bootstrap.sh` itself.
