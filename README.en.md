@@ -8,6 +8,8 @@
 
 `frm-node` is a multi-protocol proxy node manager for Debian/Ubuntu VPS hosts. It orchestrates the **official** upstream server cores: their configuration, systemd services, diagnostics and client config export. It does not implement any proxy protocol itself.
 
+Running several hosts? Its sister project [proxyfleet](https://github.com/godsonkg/proxyfleet) manages the whole fleet from one inventory file and builds and publishes the Surge, Loon and Mihomo subscriptions. frm-node manages each server; proxyfleet manages the fleet.
+
 Current version: `0.2.2`. Takeover, monitoring and subscription export have been tested on 6 real VPS hosts. It is still a personal tool and has not been fully validated across distributions and CPU architectures. See [SECURITY.md](SECURITY.md) (Chinese) for the security boundary and known trade-offs.
 
 <p align="center"><img src="docs/images/frm-menu.png" alt="frm Chinese menu and instance status table" width="720"></p>
@@ -215,7 +217,17 @@ The collector produces two sets of output:
 
 It rejects duplicate node names before writing anything, and never modifies your existing configs, policy groups or rules.
 
-Phase 1 reuses existing SSH access and opens no new ports. **All outputs contain full node credentials.** Never upload them to a public Git repository, a cloud drive or a chat. An HTTPS auto-updating subscription is Phase 2 and should only be deployed separately once Phase 1 has proven stable.
+Phase 1 reuses existing SSH access and opens no new ports. **All outputs contain full node credentials.** Never upload them to a public Git repository, a cloud drive or a chat.
+
+### Many hosts: proxyfleet
+
+[proxyfleet](https://github.com/godsonkg/proxyfleet) calls the same `frm-node sub fragment` and adds:
+
+- one `fleet.yaml` for every machine's lifecycle state (observing, active, disabled, retired), per-client protocols, and opt-in usage groups such as AI or streaming;
+- node count and name checks, canary runs for new machines, and diffs between builds (names only, never credentials);
+- publishing to your own HTTPS server through an SFTP-only account, with server-side verification, an atomic switch, and rotation of the secret path if the URL leaks.
+
+`tools/frm-sub-collect.sh` stays as a lightweight option when you don't want to install proxyfleet. proxyfleet's server scripts (v0.2.0) have not yet been verified on a real host; see its README.
 
 ## Certificate fingerprint pinning (`frm cert`)
 

@@ -8,6 +8,8 @@
 
 `frm-node` 是面向 Debian/Ubuntu VPS 的中文多协议节点管理器。它只负责编排官方核心、配置、systemd 服务、诊断和客户端导出，不自行实现代理协议。
 
+管理多台 VPS 时，可搭配姊妹项目 [proxyfleet](https://github.com/godsonkg/proxyfleet)：frm-node 负责单台服务器，proxyfleet 用一份清单管理整个机队，并生成、发布 Surge / Loon / Mihomo 订阅。
+
 当前版本：`0.2.2`。已在 6 台真实 VPS 上完成接管、监控与订阅导出的实机验证；仍是个人自用工具，未做多发行版与多架构的完整验证。安全边界与已知取舍见 [SECURITY.md](SECURITY.md)。
 
 <p align="center"><img src="docs/images/frm-menu.png" alt="frm 中文菜单与节点状态表" width="720"></p>
@@ -188,7 +190,17 @@ bash tools/frm-sub-collect.sh \
 
 汇总器同时生成两套产物：`providers/` 是 Surge `policy-path`、Loon 待实机导入验证的纯节点列表和 Mihomo proxy-provider 使用的节点集合；`snippets/` 带 `[Proxy]` 或 `proxies:` 外壳，供嵌入手工精调配置。它会在写入前拒绝重复节点名，但不会修改现有配置、策略组或规则。
 
-Phase 1 只复用现有 SSH，不增加监听端口。所有产物都含完整节点凭据，禁止上传公开 Git、网盘或聊天。HTTPS 自动订阅属于 Phase 2，必须在 Phase 1 实测稳定后另行部署。
+Phase 1 只复用现有 SSH，不增加监听端口。所有产物都含完整节点凭据，禁止上传公开 Git、网盘或聊天。
+
+### 机器较多时：proxyfleet
+
+[proxyfleet](https://github.com/godsonkg/proxyfleet) 调用的是同一个 `frm-node sub fragment`，在此基础上提供：
+
+- 一份 `fleet.yaml` 管理所有机器的状态（观察期 / 正式 / 停用 / 退役）、各客户端协议和用途分组（AI、流媒体等，只能显式加入）；
+- 采集前后的节点数量与名称核对、新机器的 canary 试运行、两次生成之间的变化比较（只显示节点名，不显示凭据）；
+- 通过只能 SFTP 的受限账号发布到自己的 HTTPS 服务器，服务端校验后原子切换，订阅地址泄露时可轮换秘密路径。
+
+`tools/frm-sub-collect.sh` 继续保留，作为不安装 proxyfleet 时的轻量选择。proxyfleet 的服务器脚本目前（v0.2.0）尚未在真实主机上验证，详见其 README。
 
 ## 证书指纹钉扎（frm cert）
 
