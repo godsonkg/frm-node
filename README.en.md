@@ -10,6 +10,9 @@
 
 Current version: `0.2.2`. Takeover, monitoring and subscription export have been tested on 6 real VPS hosts. It is still a personal tool and has not been fully validated across distributions and CPU architectures. See [SECURITY.md](SECURITY.md) (Chinese) for the security boundary and known trade-offs.
 
+<p align="center"><img src="docs/images/frm-menu.png" alt="frm Chinese menu and instance status table" width="720"></p>
+<p align="center"><sub>The Chinese menu and the <code>frm status</code> table (demo data)</sub></p>
+
 > **Note:** the interactive menu, prompts and diagnostic output are in Simplified Chinese. All commands and flags are the English ones listed below.
 
 ## Highlights

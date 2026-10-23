@@ -73,6 +73,19 @@ if grep -q 'method:"raw"' "$ROOT/protocols/reality.sh"; then exit 1; fi
 # 菜单选实例时表格必须走 stderr，否则会被 $(...) 捕获导致菜单失效。
 grep -q 'registry_table >&2' "$ROOT/frm-node"
 
+# 状态表的中文表头必须按显示宽度与数据列对齐（中文字符占两列）。
+col_starts() {
+  local LC_ALL=C.UTF-8 line i starts=() prev=' '
+  line=${1//[^ -~]/XX}
+  for ((i = 0; i < ${#line}; i++)); do
+    [[ $prev == ' ' && ${line:i:1} != ' ' ]] && starts+=("$i")
+    prev=${line:i:1}
+  done
+  printf '%s\n' "${starts[*]:0:6}"
+}
+table=$(registry_table)
+[[ $(col_starts "$(sed -n 1p <<<"$table")") == "$(col_starts "$(grep '^test-anytls ' <<<"$table")")" ]]
+
 # Snell 下载校验钉扎机制必须保留。
 grep -q 'verify_pinned_sha256' "$ROOT/protocols/base.sh"
 
