@@ -83,7 +83,9 @@ registry_remove() {
 
 registry_table() {
   local id service state ownership owner_label
-  printf '%-24s %-18s %-8s %-6s %-10s %-10s\n' "实例" "协议" "端口" "传输" "状态" "管理模式"
+  # printf pads by bytes or characters depending on locale, never by display
+  # width, so the CJK header is padded by hand to line up with the rows.
+  printf '%s\n' "实例                     协议               端口     传输   状态       管理模式"
   printf '%-24s %-18s %-8s %-6s %-10s %-10s\n' "------------------------" "------------------" "--------" "------" "----------" "----------"
   while IFS= read -r id; do
     service=$(registry_get "$id" '.services[0]')
