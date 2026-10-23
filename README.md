@@ -4,7 +4,7 @@
 
 `frm-node` 是面向 Debian/Ubuntu VPS 的中文多协议节点管理器。它只负责编排官方核心、配置、systemd 服务、诊断和客户端导出，不自行实现代理协议。
 
-当前版本：`0.2.1`。已在 6 台真实 VPS 上完成接管、监控与订阅导出的实机验证；仍是个人自用工具，未做多发行版与多架构的完整验证。安全边界与已知取舍见 [SECURITY.md](SECURITY.md)。
+当前版本：`0.2.2`。已在 6 台真实 VPS 上完成接管、监控与订阅导出的实机验证；仍是个人自用工具，未做多发行版与多架构的完整验证。安全边界与已知取舍见 [SECURITY.md](SECURITY.md)。
 
 ## 已实现协议
 
@@ -31,13 +31,13 @@ TUIC v5、Shadowsocks 2022、NaiveProxy 和证书型 VLESS/Trojan 计划放入�
 安装需要 root。建议固定 tag 或完整 commit SHA，并先检查下载的脚本；跟随 `main` 会安装当时的最新提交：
 
 ```bash
-FRM_REF=v0.2.1 bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.1/bootstrap.sh)
+FRM_REF=v0.2.2 bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.2/bootstrap.sh)
 ```
 
 安装器会打印安装包的 SHA-256。记下首次可信安装的值，之后可加 `FRM_SHA256` 强制校验，内容不符即中止：
 
 ```bash
-FRM_REF=v0.2.1 FRM_SHA256="填入可信的安装包 SHA-256" bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.1/bootstrap.sh)
+FRM_REF=v0.2.2 FRM_SHA256="填入可信的安装包 SHA-256" bash <(curl -fsSL https://raw.githubusercontent.com/godsonkg/frm-node/v0.2.2/bootstrap.sh)
 ```
 
 上例的 `FRM_SHA256` 需要替换为实际校验值；它校验的是安装包，不是 `bootstrap.sh`。
