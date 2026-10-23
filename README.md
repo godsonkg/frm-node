@@ -10,6 +10,9 @@
 
 当前版本：`0.2.2`。已在 6 台真实 VPS 上完成接管、监控与订阅导出的实机验证；仍是个人自用工具，未做多发行版与多架构的完整验证。安全边界与已知取舍见 [SECURITY.md](SECURITY.md)。
 
+<p align="center"><img src="docs/images/frm-menu.png" alt="frm 中文菜单与节点状态表" width="720"></p>
+<p align="center"><sub>中文菜单与 <code>frm status</code> 状态表（演示数据）</sub></p>
+
 ## 已实现协议
 
 | 协议 | 服务端实现 | 部署模式 |
