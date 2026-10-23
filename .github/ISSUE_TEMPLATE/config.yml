@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞 / Security vulnerability
+    url: https://github.com/godsonkg/frm-node/security/advisories/new
+    about: 请私密报告，不要开公开 Issue。Report privately; do not open a public issue.
+  - name: 使用文档 / Documentation
+    url: https://github.com/godsonkg/frm-node#readme
+    about: 安装、命令和常见限制见 README。See the README for installation, commands and known limits.

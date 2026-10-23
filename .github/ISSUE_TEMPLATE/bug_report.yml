@@ -1,0 +1,93 @@
+name: 问题报告 / Bug report
+description: frm-node 运行出错或行为与文档不符 / Something fails or behaves differently from the docs
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **不要粘贴任何凭据**：密码、PSK、UUID、私钥、订阅地址、完整节点链接，以及 `frm show`、`frm sub fragment` 的输出。日志里的服务器 IP 请替换为 `203.0.113.x` 之类的占位值。
+        ⚠️ **Never paste credentials**: passwords, PSKs, UUIDs, private keys, subscription URLs, full node links, or output of `frm show` / `frm sub fragment`. Replace server IPs in logs with placeholders such as `203.0.113.x`.
+
+        安全漏洞请走 [私密报告](https://github.com/godsonkg/frm-node/security/advisories/new)。For security issues, use [private reporting](https://github.com/godsonkg/frm-node/security/advisories/new).
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认 / Confirm
+      options:
+        - label: 我已检查，下面的内容不含任何凭据或真实订阅地址 / I have checked that nothing below contains credentials or real subscription URLs
+          required: true
+        - label: 我已搜索过现有 Issue / I have searched existing issues
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: frm-node 版本 / Version
+      description: "`frm --version` 的输出 / Output of `frm --version`"
+      placeholder: frm-node 0.2.2
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: 系统与架构 / OS and architecture
+      placeholder: Debian 12, amd64
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相关功能 / Area
+      multiple: true
+      options:
+        - 安装 / Install
+        - 协议实例 / Protocol instance (install, start, uninstall)
+        - 客户端导出 / Client export (frm show)
+        - 旧节点接管 / Adoption (frm adopt)
+        - 监控 / Monitoring (frm watch)
+        - 订阅片段 / Subscription fragments (frm sub)
+        - 证书钉扎 / Certificate pinning (frm cert)
+        - 核心更新 / Core update (frm update)
+        - 备份与恢复 / Backup and restore
+        - 其他 / Other
+    validations:
+      required: true
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: 相关协议 / Protocol
+      multiple: true
+      options:
+        - VLESS Reality
+        - AnyTLS
+        - Hysteria2
+        - Snell v4
+        - Snell v5
+        - Snell v6
+        - ShadowTLS
+        - 不涉及 / Not applicable
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么 / What happened
+      description: 执行了什么命令，看到了什么结果 / The command you ran and what you saw
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果 / Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      placeholder: |
+        1. frm install anytls
+        2. ...
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 诊断输出 / Diagnostics
+      description: "`frm doctor` 的输出；如果和旧节点接管有关，附上 `frm adopt report`（已脱敏）。端口号可以打码。/ Output of `frm doctor`; for adoption issues add `frm adopt report` (redacted). You may mask port numbers."
+      render: text

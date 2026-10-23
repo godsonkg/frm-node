@@ -1,5 +1,9 @@
 # frm-node 中文节点管理器
 
+[![test](https://github.com/godsonkg/frm-node/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/godsonkg/frm-node/actions/workflows/test.yml)
+[![release](https://img.shields.io/github/v/release/godsonkg/frm-node)](https://github.com/godsonkg/frm-node/releases/latest)
+[![license](https://img.shields.io/github/license/godsonkg/frm-node)](LICENSE)
+
 **简体中文** | [English](README.en.md)
 
 `frm-node` 是面向 Debian/Ubuntu VPS 的中文多协议节点管理器。它只负责编排官方核心、配置、systemd 服务、诊断和客户端导出，不自行实现代理协议。
